@@ -193,10 +193,8 @@ int main(int argc, char** argv)
 	double y_disp;
 	double ftx_0 = 0.0;
 	double fty_0 = 0.0;
-	int *data;	//pointer to shared memory
-	data = MakeFloatSharedMemory(2);
-	float *data2; //pointer to shared memory
-	data2 = MakeFloatSharedMemory2(2);
+	int *data = MakeFloatSharedMemory(2);	//pointer to shared memory
+	float *data2 = MakeFloatSharedMemory2(2); //pointer to shared memory
 	int cc = 1;
 	double al = 0.5;
 	int firstIt = 0;
@@ -1175,9 +1173,8 @@ int *MakeFloatSharedMemory(int HowBig)
 {
 	key_t key;
 	int shmid;
-	int *dataShared;
+	int *dataShared = (int *)malloc(HowBig * sizeof(int));
 
-	dataShared = (int *)malloc(HowBig * sizeof(int));
 	/* make the key */
 	if ((key = ftok("/home/justin/Desktop/FRI-Client-SDK_Cpp/example/PositionControl2/shmfile", 'R')) == -1)
 	{
@@ -1213,9 +1210,7 @@ float *MakeFloatSharedMemory2(int HowBig2)
 {
 	key_t key2;
 	int shmid2;
-	float *dataShared2;
-
-	dataShared2 = (float *)malloc(HowBig2 * sizeof(float));
+	float *dataShared2 = (float *)malloc(HowBig2 * sizeof(float));
 	/* make the key */
 	if ((key2 = ftok("/home/justin/Desktop/FRI-Client-SDK_Cpp/example/PositionControl2/shmfile2", 'R')) == -1)
 	{
