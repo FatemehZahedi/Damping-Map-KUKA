@@ -1,4 +1,3 @@
-
 #include <sys/time.h>
 #include <iostream>
 #include <cmath>
@@ -179,10 +178,10 @@ int main(int argc, char** argv)
 
 	//******************---------------------------------------
 	//---------------------------------------
+	/*double mag = 0.025;
+	double dur = 150;*/
 	double mag = 0.05;
-	double dur = 375;
-	/*double mag = 0.05;
-	double dur = 3000;*/
+	double dur = 300;
 	double ftx;
 	double fty;
 	double ftx_un;
@@ -294,6 +293,9 @@ int main(int argc, char** argv)
 	double u_r = d_r - radius_e;
 	double ex_r = d_r/4;
 
+	int t_r;
+	MatrixXd time_ran(7,1); time_ran << 0.7, 1, 0.9, 1.2, 0.8, 1.4, 0.5;
+	
 	int chosen;
 	int n_v = 0;
 	int i_c;
@@ -307,21 +309,16 @@ int main(int argc, char** argv)
 	MatrixXd point(2, 1); point << 0, 0;
 	MatrixXd P_ex(2, 1); P_ex << 0, 0;
 	MatrixXd Vector(30, 1); Vector << MatrixXd::Zero(30, 1);
-	/*MatrixXd damping_values(5, 6); damping_values << 10, 0, -10, -15, -20, -25,
-		10, 0, -10, -15, -20, -25,
-		10, 0, -10, -15, -20, -25,
-		10, 0, -10, -15, -20, -25,
-		10, 0, -10, -15, -20, -25;*/
-	/*MatrixXd damping_values(5, 6); damping_values << 10, 0, -2, -5, -10, -12,
-		10, 0, -2, -5, -10, -12,
-		10, 0, -2, -5, -10, -12,
-		10, 0, -2, -5, -10, -12,
-		10, 0, -2, -5, -10, -12;*/
-		MatrixXd damping_values(5, 6); damping_values << 10, 10, 10, 10, 10, 10,
-			10, 10, 10, 10, 10, 10,
-			10, 10, 10, 10, 10, 10,
-			10, 10, 10, 10, 10, 10,
-			10, 10, 10, 10, 10, 10;
+	MatrixXd damping_values(5, 6); damping_values << 10, 0, -10, -20, -25, -30,
+		10, 0, -10, -20, -25, -30,
+		10, 0, -10, -20, -25, -30,
+		10, 0, -10, -20, -25, -30,
+		10, 0, -10, -20, -25, -30;
+		/*MatrixXd damping_values(5, 6); damping_values << 5, 0, -5, -10, -15, -20,
+			5, 0, -5, -10, -15, -20,
+			5, 0, -5, -10, -15, -20,
+			5, 0, -5, -10, -15, -20,
+			5, 0, -5, -10, -15, -20;*/
 
 	MatrixXd random1(30,1); random1 << 1, 2, 3, 16, 11, 30, 7, 28, 17, 14, 8, 5, 29, 21, 25, 27, 26, 19, 15, 22, 23, 6, 4, 18, 24, 13, 9, 20, 10, 12;
 	MatrixXd random2(30, 1); random2 << 2, 10, 4, 5, 25, 24, 15, 30, 21, 3, 8, 28, 12, 11, 17, 16, 26, 29, 18, 23, 22, 7, 1, 19, 20, 13, 14, 6, 9, 27;
@@ -344,7 +341,7 @@ int main(int argc, char** argv)
 					0, 0, 0, 0, 0.5, 0,
 					0, 0, 0, 0, 0, 0.5;
 
-	MatrixXd inertia(6, 6); inertia << 7, 0, 0, 0, 0, 0,
+	MatrixXd inertia(6, 6); inertia << 10, 0, 0, 0, 0, 0,
 					0, 0.000001, 0, 0, 0, 0,
 					0, 0, 10, 0, 0, 0,
 					0, 0, 0, 0.0001, 0, 0,
@@ -660,7 +657,6 @@ int main(int argc, char** argv)
 				flag_finish = 1;
 				q_freeze << q_new;
 			}
-
 			/*if (flag_v == 1)
 			{
 				random_v = rand() % 3 + 1;
@@ -717,23 +713,23 @@ int main(int argc, char** argv)
 			}
 			else if (chosen_point == 1)
 			{
-				desired(0) = 0.1;
-				desired(1) = 0.86;
+				desired(0) = 0.075;
+				desired(1) = 0.835;
 			}
 			else if (chosen_point == 2)
 			{
-				desired(0) = -0.1;
-				desired(1) = 0.86;
+				desired(0) = -0.075;
+				desired(1) = 0.835;
 			}
 			else if (chosen_point == 3)
 			{
-				desired(0) = 0.1;
-				desired(1) = 0.66;
+				desired(0) = 0.075;
+				desired(1) = 0.685;
 			}
 			else if (chosen_point == 4)
 			{
-				desired(0) = -0.1;
-				desired(1) = 0.66;
+				desired(0) = -0.075;
+				desired(1) = 0.685;
 			}
 
 
@@ -839,6 +835,7 @@ int main(int argc, char** argv)
 			if (flag_p < 3)
 			{
 				random_num = rand() % 2 + 1;
+				t_r = rand() % 6 + 0;
 			}
 
 			if (flag_p == 3)
@@ -846,8 +843,10 @@ int main(int argc, char** argv)
 			  steady2++;
 			  flag_ex = 0;
 			}
+			
+			
 
-			if (flag_p == 3 && steady2 >= 1000 && cc == 1 && steady > 2000)
+			if (flag_p == 3 && steady2 >= time_ran(t_r)*1000 && cc == 1 && steady > 2000)
 			{
 				std::cout << "flag_p"<< std::endl;
 				std::cout << flag_p << std::endl;
@@ -1010,7 +1009,7 @@ int main(int argc, char** argv)
 			{
 			  steady3++;
 			}
-			if (steady3 > 1000)
+			if (steady3 > 4000)
 			{
 				flag_I = 1;
 				flag_chosen = 1;
@@ -1034,7 +1033,7 @@ int main(int argc, char** argv)
 			//----------------------------------------------
 
 
-			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %d %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), perturb_flag, x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5));
+			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %d %lf %lf %lf %lf %lf %lf %lf %lf %lf %d %d %d\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), perturb_flag, x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5), damping(0,0), desired(0), desired(1), trigger, chosen, random_num);
 
 			// Use commanded x--------------------------------------------------------------------------
 			x_003 << x_03;
@@ -1134,6 +1133,7 @@ int main(int argc, char** argv)
 			xy_coord[7] = P_ex(0);
 			xy_coord[8] = P_ex(1);
 			xy_coord[9] = ex_r;
+			xy_coord[10] = damping(0,0);
 			udp_server.Send(xy_coord, 16);
 
 
