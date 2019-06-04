@@ -67,28 +67,28 @@ bool ParseSubjectMetadataFile(SubjectMetadata & smds, std::string filepath){
             std::transform(key.begin(), key.end(), key.begin(), ::toupper);
 
             /* Compare key string and assign values to SubjectMetdata struct */
-            if (key.compare("NAME")){
+            if (key.compare("NAME") == 0){
                 smds.Name = valstr;
                 hasName = true;
             }
-            else if (key.compare("NUMBER")){
-				smds.Number = atoi(valstr.c_str());
+            else if (key.compare("NUMBER") == 0){
+            	smds.Number = atoi(valstr.c_str());
                 hasSubjectNumber = true;
             }
-            else if (key.compare("AGE")){
-				smds.Age = atoi(valstr.c_str());
+            else if (key.compare("AGE") == 0){
+            	smds.Age = atoi(valstr.c_str());
             }
-            else if (key.compare("HEIGHT")){
-				smds.Height = atoi(valstr.c_str());
+            else if (key.compare("HEIGHT") == 0){
+            	smds.Height = atoi(valstr.c_str());
 			}
-            else if (key.compare("WEIGHT")){
-				smds.Weight = atof(valstr.c_str());
+            else if (key.compare("WEIGHT") == 0){
+            	smds.Weight = atof(valstr.c_str());
             }
-            else if (key.compare("GENDER")){
-				smds.Gender = valstr;
+            else if (key.compare("GENDER") == 0){
+            	smds.Gender = valstr;
             }
-            else if (key.compare("H5FILE")){
-				smds.H5File = valstr;
+            else if (key.compare("H5FILE") == 0){
+            	smds.H5File = valstr;
                 hasH5Filepath = true;
             }
             else{
@@ -103,6 +103,9 @@ bool ParseSubjectMetadataFile(SubjectMetadata & smds, std::string filepath){
         return true;
     }
     else{
+        printf("hasName: %s\n", smds.Name.c_str());
+        printf("hasH5Filepath: %s\n", smds.H5File.c_str());
+        printf("hasSubjectNumber: %d\n", smds.Number);
         printf("File found, but not enough information specified in file\n");
         printf("RESULTS WILL NOT BE RECORDED\n");
         return false;
@@ -269,13 +272,13 @@ int main(int argc, char ** argv){
         CreateNumericAttribute(group_trial, "Damping", -5);
 
         TrialDatasets td = CreateTrialDatasets(group_trial);
-        
+
+
+        /* Close */
+        file->close();
+        printf("file closed\n");
     }
 
 
-
-    /* Close */
-    file->close();
-    printf("file closed\n");
 
 }

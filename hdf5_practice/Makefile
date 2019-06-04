@@ -1,17 +1,16 @@
 # Edit the following variables as needed
 HDF_INSTALL = /usr/local/hdf5
-EXTLIB      = -L$(HDF_INSTALL)/lib
-HDFLIB      = $(HDF_INSTALL)/lib
+EXTLIB      = -L$(HDF_INSTALL)/lib64
+HDFLIB      = $(HDF_INSTALL)/lib64
 CC          = g++
 CFLAGS      =
-LIB         = -lsz -lz -lm -ldl
+LIB         = -lz -lm -ldl #-lsz
 
 TARGET = h5_practice
 
 INCLUDE   = -I$(HDF_INSTALL)/include
 LIBSHDF   = $(EXTLIB) -lhdf5_cpp \
                       -lhdf5
-LIBSHDF_CPP = -L$(HDFLIB)/libhdf5_cpp.a $(HDFLIB)/libhdf5_hl_cpp.a
 
 all: $(TARGET)
 
