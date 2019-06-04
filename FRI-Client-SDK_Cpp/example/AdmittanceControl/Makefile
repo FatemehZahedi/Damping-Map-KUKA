@@ -16,7 +16,7 @@ HDF_LIBS 	= -L$(HDF_LIB)	\
 
 # ------------------------------------------
 
-SOURCES 		= KukaVariableDamping.cpp \
+SOURCES 		= AdmittanceControl.cpp \
 			 	  PositionControlClient.cpp \
 				  UdpServer.cpp
 

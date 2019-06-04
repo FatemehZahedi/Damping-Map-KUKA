@@ -8,8 +8,8 @@
 #include <fstream>
 #include <memory>
 #include "H5Cpp.h"
-using namespace H5;
 
+using namespace H5;
 
 typedef struct SubjectMetadata{
     std::string Name;

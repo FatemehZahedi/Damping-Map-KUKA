@@ -1,4 +1,3 @@
-
 #include <sys/time.h>
 #include <iostream>
 #include <cmath>
@@ -6,7 +5,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <math.h>
-#include <string.h> // strstr
+#include <string.h>
 #include "PositionControlClient.h"
 #include "friUdpConnection.h"
 #include "friClientApplication.h"
