@@ -22,7 +22,7 @@ SOURCES 		= KukaVariableDamping.cpp \
 
 TARGET 		= KukaVariableDamping
 
-CXXFLAGS 		+=
+CXXFLAGS 		+= -std=c++11 -pthread
 LDFLAGS 		+= $(LIB_DIR)/libFRIClient.a
 LDFLAGS			+= $(HDF_LIBS)
 INCLUDE 		= 	-I/usr/include/	\
