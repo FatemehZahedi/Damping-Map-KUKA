@@ -16,11 +16,11 @@ HDF_LIBS 	= -L$(HDF_LIB)	\
 
 # ------------------------------------------
 
-SOURCES 		= AdmittanceControl.cpp \
+SOURCES 		= VariableDamping.cpp \
 			 	  PositionControlClient.cpp \
 				  UdpServer.cpp
 
-TARGET 		= AdmittanceControl
+TARGET 		= VariableDamping
 
 CXXFLAGS 		+=
 LDFLAGS 		+= $(LIB_DIR)/libFRIClient.a
