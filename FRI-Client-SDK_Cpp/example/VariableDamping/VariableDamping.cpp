@@ -55,8 +55,8 @@ int main(int argc, char** argv)
 
 	/* Variables related to variable dampings*/
 	float dt = 0.001;
-	double kp = 1.0;
-	double kn = 1.0;
+	double kp = 2.0;
+	double kn = 2.0;
 	double b_var;					// Variable damping
 	double b_LB = -20;				// Lower bound of damping
 	double b_UB = 10;				// Upper bound of damping
@@ -120,8 +120,9 @@ int main(int argc, char** argv)
 	double rangey_ = 0.58;
 	double rangey = 0.94;
 	double d_r = 0;
-	double u_r = (rangex * 2) / 25;
-	double ex_r = u_r - radius_e;
+	double ex_r = (rangex * 2) / 25;
+	double u_r = ex_r - radius_e;;
+	
 
 	/* Variables related to defining target*/
 	int mode = 2;
@@ -369,12 +370,12 @@ int main(int argc, char** argv)
 
 			if (flag_p == 0)
 			{
-				P_ex(0) = desired(0) + 0.05;
+				P_ex(0) = desired(0) + 0.15;
 				P_ex(1) = desired(1);
 			}
 			else if (flag_p == 1)
 			{
-				P_ex(0) = desired(0) - 0.05;
+				P_ex(0) = desired(0) - 0.15;
 				P_ex(1) = desired(1);
 			}
 			else
