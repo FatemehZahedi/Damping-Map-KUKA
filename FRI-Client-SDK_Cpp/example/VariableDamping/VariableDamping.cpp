@@ -122,7 +122,10 @@ int main(int argc, char** argv)
 	double d_r = 0;
 	double u_r = (rangex * 2) / 25;
 	double ex_r = u_r - radius_e;
+
+	/* Variables related to defining target*/
 	int mode = 2;
+	int flag_p = 0;
 	MatrixXd desired(2, 1); desired << 0, 0.76;
 	MatrixXd point(2, 1); point << 0, 0;
 	MatrixXd P_ex(2, 1); P_ex << 0, 0;
