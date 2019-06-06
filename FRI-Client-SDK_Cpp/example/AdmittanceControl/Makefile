@@ -20,7 +20,7 @@ SOURCES 		= AdmittanceControl.cpp \
 			 	  PositionControlClient.cpp \
 				  UdpServer.cpp
 
-TARGET 		= KukaVariableDamping
+TARGET 		= AdmittanceControl
 
 CXXFLAGS 		+=
 LDFLAGS 		+= $(LIB_DIR)/libFRIClient.a
