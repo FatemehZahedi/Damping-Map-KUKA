@@ -59,35 +59,35 @@ int main(int argc, char** argv){
     int port = atoi(argv[2]);
     EmgClient emg(ipAddr, port);
 
-    // /* Put Elements Into Array */
-    // int nRows = 3;
-    // int nCols = 6;
-    // int arr[nRows][nCols];
-    // memset(arr, 0, sizeof(arr));
-    //
-    // int count = 0;
-    // int tempRow[nCols];
-    // int iRow = 0;
-    // int iCol = 0;
-    // for (iRow = 0; iRow<nRows; ++iRow){
-    //     // zero out tempRow
-    //     memset(tempRow, 0, nCols*sizeof(int));
-    //     // fill tempRow
-    //     for (iCol=0; iCol<nCols; iCol++){
-    //         tempRow[iCol] = count;
-    //         count++;
-    //     }
-    //     // copy tempRow to row of arr
-    //     memcpy(&arr[iRow][0], tempRow, nCols*sizeof(int));
-    // }
-    //
-    // // print array
-    // for (iRow=0; iRow<nRows; iRow++){
-    //     printf("\n");
-    //     for (iCol=0; iCol<nCols; iCol++){
-    //         printf("%d\t", arr[iRow][iCol]);
-    //     }
-    // }
+    /* Put Elements Into Array */
+    int nRows = 3;
+    int nCols = 6;
+    int arr[nRows][nCols];
+    memset(arr, 0, sizeof(arr));
+    
+    int count = 0;
+    int tempRow[nCols];
+    int iRow = 0;
+    int iCol = 0;
+    for (iRow = 0; iRow<nRows; ++iRow){
+        // zero out tempRow
+        memset(tempRow, 0, nCols*sizeof(int));
+        // fill tempRow
+        for (iCol=0; iCol<nCols; iCol++){
+            tempRow[iCol] = count;
+            count++;
+        }
+        // copy tempRow to row of arr
+        memcpy(&arr[iRow][0], tempRow, nCols*sizeof(int));
+    }
+    
+    // print array
+    for (iRow=0; iRow<nRows; iRow++){
+        printf("\n");
+        for (iCol=0; iCol<nCols; iCol++){
+            printf("%d\t", arr[iRow][iCol]);
+        }
+    }
 
 
 }

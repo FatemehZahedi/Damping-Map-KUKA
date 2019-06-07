@@ -103,7 +103,6 @@ void SendMsg(int & sock){
     printf("send return val: %d\n", retval);
 }
 
-
 KeyboardCommand GetKeyboardCommand(){
     char keyboard_input[256] = "";
     bool validInput = false;
