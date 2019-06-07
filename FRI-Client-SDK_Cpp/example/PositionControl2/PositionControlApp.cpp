@@ -1,4 +1,3 @@
-
 #include <sys/time.h>
 #include <iostream>
 #include <cmath>
@@ -45,45 +44,45 @@ float *MakeFloatSharedMemory2(int HowBig2);
 
 // UDP-----------------------------------------------------------------------------------
 
-class UDPServer{
+class UDPServer {
 private:
-    // UDP/IP socket info
+	// UDP/IP socket info
 	std::string _addr;
 	int _port;
-    int _sockfd;
+	int _sockfd;
 
-    // Server/Client address info
+	// Server/Client address info
 	struct sockaddr_in _servaddr;
 	struct sockaddr_in _cliaddr;
 	socklen_t _cliaddrlen = sizeof(_cliaddr);
 
-    // Recv/send limit
-    const int _maxlen = 1024;
+	// Recv/send limit
+	const int _maxlen = 1024;
 
-    // Connection State
-    bool _connected = false;
+	// Connection State
+	bool _connected = false;
 
-    // select(2) related data
-    fd_set _readset;
-    struct timeval _select_timeout = {.tv_sec = 0, .tv_usec = 0};
+	// select(2) related data
+	fd_set _readset;
+	struct timeval _select_timeout = { .tv_sec = 0,.tv_usec = 0 };
 
 public:
-    // Class Methods
+	// Class Methods
 	UDPServer(std::string addr, int port);
 	std::string GetAddress();
 	int GetPort();
 	bool IsConnected() const;
 	void ConnectClient();
-    void ConnectIfNecessary();
+	void ConnectIfNecessary();
 	template<typename T>
 	void Send(T* data, int ndata);
 };
 
-UDPServer::UDPServer(std::string addr, int port): _port(port), _addr(addr){
+UDPServer::UDPServer(std::string addr, int port) : _port(port), _addr(addr) {
 
 	// Initialize socket
 	_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (_sockfd < 0){
+	if (_sockfd < 0) {
 		perror("socket creation failed");
 		exit(EXIT_FAILURE);
 	}
@@ -97,64 +96,64 @@ UDPServer::UDPServer(std::string addr, int port): _port(port), _addr(addr){
 	_servaddr.sin_port = htons(_port);
 
 	// Bind the socket with the server address
-	if (bind(_sockfd, (const struct sockaddr *)&_servaddr,sizeof(_servaddr)) < 0)
+	if (bind(_sockfd, (const struct sockaddr *)&_servaddr, sizeof(_servaddr)) < 0)
 	{
 		perror("bind failed");
 		exit(EXIT_FAILURE);
 	}
 }
 
-void UDPServer::ConnectIfNecessary(){
-    /*
-    select(2) system call monitors if there is an incoming messge from the client
-    If there is, select(2) will return a number greater than 0.  We will then connect
-    run ConnectClient() which reads in the message and gets the client's ip info
-    so the server can send messages to it
-    */
-    FD_ZERO(&_readset);
-    FD_SET(_sockfd, &_readset);
-    int ret = select(_sockfd+1, &_readset, NULL, NULL, &_select_timeout);
-    if (ret > 0){
-        ConnectClient();
-    }
+void UDPServer::ConnectIfNecessary() {
+	/*
+	select(2) system call monitors if there is an incoming messge from the client
+	If there is, select(2) will return a number greater than 0.  We will then connect
+	run ConnectClient() which reads in the message and gets the client's ip info
+	so the server can send messages to it
+	*/
+	FD_ZERO(&_readset);
+	FD_SET(_sockfd, &_readset);
+	int ret = select(_sockfd + 1, &_readset, NULL, NULL, &_select_timeout);
+	if (ret > 0) {
+		ConnectClient();
+	}
 }
 
-std::string UDPServer::GetAddress(){
-    // return server's ip address
+std::string UDPServer::GetAddress() {
+	// return server's ip address
 	return _addr;
 }
 
-int UDPServer::GetPort(){
-    // return server's port
+int UDPServer::GetPort() {
+	// return server's port
 	return _port;
 }
 
-bool UDPServer::IsConnected() const{
-    // return server-client connection status
-    return _connected;
+bool UDPServer::IsConnected() const {
+	// return server-client connection status
+	return _connected;
 }
 
-void UDPServer::ConnectClient(){
-    /*
-    recvfrom() system call reads the message into the buffer and fills the _cliaddr
-    struct with the client's ip info.  The message in the buffer is not important.
-    We only do this so we get the client's ip address info
-    */
+void UDPServer::ConnectClient() {
+	/*
+	recvfrom() system call reads the message into the buffer and fills the _cliaddr
+	struct with the client's ip info.  The message in the buffer is not important.
+	We only do this so we get the client's ip address info
+	*/
 	char buffer[_maxlen];
 	int n;
 	n = recvfrom(_sockfd, (char *)buffer, _maxlen,
-				MSG_WAITALL, ( struct sockaddr *) &_cliaddr, &_cliaddrlen);
+		MSG_WAITALL, (struct sockaddr *) &_cliaddr, &_cliaddrlen);
 	_connected = true;
 }
 
 template<typename T>
-void UDPServer::Send(T* data, int ndata){
-    // Connect/Reconnect to client if necessary (get's clients ip address info)
-    ConnectIfNecessary();
-    // Send data if the server is connected to a client
-	if (_connected){
-		sendto(_sockfd, (const T *) data, sizeof(data)*ndata,
-  				 MSG_DONTWAIT, (const struct sockaddr *) &_cliaddr, _cliaddrlen);
+void UDPServer::Send(T* data, int ndata) {
+	// Connect/Reconnect to client if necessary (get's clients ip address info)
+	ConnectIfNecessary();
+	// Send data if the server is connected to a client
+	if (_connected) {
+		sendto(_sockfd, (const T *)data, sizeof(data)*ndata,
+			MSG_DONTWAIT, (const struct sockaddr *) &_cliaddr, _cliaddrlen);
 	}
 }
 
@@ -179,10 +178,10 @@ int main(int argc, char** argv)
 
 	//******************---------------------------------------
 	//---------------------------------------
+	/*double mag = 0.025;
+	double dur = 150;*/
 	double mag = 0.05;
-	double dur = 375;
-	/*double mag = 0.05;
-	double dur = 3000;*/
+	double dur = 300;
 	double ftx;
 	double fty;
 	double ftx_un;
@@ -202,7 +201,7 @@ int main(int argc, char** argv)
 	int firstIt = 0;
 	int trigger = 1;
 	int w = 0;
-	int random_num;
+	double random_num;
 	double ft[2];
 	int steady = 0;
 	int steady2 = 0;
@@ -229,7 +228,7 @@ int main(int argc, char** argv)
 	int fj2 = 0;*/
 
 	double xy_coord[16];
-	memset(xy_coord, 0, sizeof(double)*16);
+	memset(xy_coord, 0, sizeof(double) * 16);
 
 	//-----------------------------------------------
 	//********************-----------------------------------------------
@@ -290,9 +289,12 @@ int main(int argc, char** argv)
 	double rangex = 0.18;
 	double rangey_ = 0.58;
 	double rangey = 0.94;
-	double d_r = (rangex*2)/20;
+	double d_r = (rangex * 2) / 20;
 	double u_r = d_r - radius_e;
-	double ex_r = d_r/4;
+	double ex_r = d_r / 4;
+
+	int t_r;
+	MatrixXd time_ran(7, 1); time_ran << 0.7, 1, 0.9, 1.2, 0.8, 1.4, 0.5;
 
 	int chosen;
 	int n_v = 0;
@@ -307,49 +309,107 @@ int main(int argc, char** argv)
 	MatrixXd point(2, 1); point << 0, 0;
 	MatrixXd P_ex(2, 1); P_ex << 0, 0;
 	MatrixXd Vector(30, 1); Vector << MatrixXd::Zero(30, 1);
-	/*MatrixXd damping_values(5, 6); damping_values << 10, 0, -10, -15, -20, -25,
-		10, 0, -10, -15, -20, -25,
-		10, 0, -10, -15, -20, -25,
-		10, 0, -10, -15, -20, -25,
-		10, 0, -10, -15, -20, -25;*/
-	/*MatrixXd damping_values(5, 6); damping_values << 10, 0, -2, -5, -10, -12,
-		10, 0, -2, -5, -10, -12,
-		10, 0, -2, -5, -10, -12,
-		10, 0, -2, -5, -10, -12,
-		10, 0, -2, -5, -10, -12;*/
-		MatrixXd damping_values(5, 6); damping_values << 10, 10, 10, 10, 10, 10,
-			10, 10, 10, 10, 10, 10,
-			10, 10, 10, 10, 10, 10,
-			10, 10, 10, 10, 10, 10,
-			10, 10, 10, 10, 10, 10;
+	MatrixXd damping_values(5, 6); damping_values << 10, 0, -10, -20, -25, -30,
+		10, 0, -10, -20, -25, -30,
+		10, 0, -10, -20, -25, -30,
+		10, 0, -10, -20, -25, -30,
+		10, 0, -10, -20, -25, -30;
+	/*MatrixXd damping_values(5, 6); damping_values << 5, 0, -5, -10, -15, -20,
+	5, 0, -5, -10, -15, -20,
+	5, 0, -5, -10, -15, -20,
+	5, 0, -5, -10, -15, -20,
+	5, 0, -5, -10, -15, -20;*/
 
-	MatrixXd random1(30,1); random1 << 1, 2, 3, 16, 11, 30, 7, 28, 17, 14, 8, 5, 29, 21, 25, 27, 26, 19, 15, 22, 23, 6, 4, 18, 24, 13, 9, 20, 10, 12;
+	MatrixXd random1(30, 1); random1 << 1, 2, 3, 16, 11, 30, 7, 28, 17, 14, 8, 5, 29, 21, 25, 27, 26, 19, 15, 22, 23, 6, 4, 18, 24, 13, 9, 20, 10, 12;
 	MatrixXd random2(30, 1); random2 << 2, 10, 4, 5, 25, 24, 15, 30, 21, 3, 8, 28, 12, 11, 17, 16, 26, 29, 18, 23, 22, 7, 1, 19, 20, 13, 14, 6, 9, 27;
 	MatrixXd random3(30, 1); random3 << 8, 9, 17, 14, 18, 12, 2, 10, 26, 16, 21, 29, 20, 3, 7, 24, 30, 23, 19, 4, 1, 28, 27, 13, 22, 11, 5, 25, 15, 6;
+
+	// Matrix for direction of perturbation
+	MatrixXd random_mat(5, 6); random_mat << MatrixXd::Zero(5, 6);
+	MatrixXd random_num1(5, 6); random_num1 << 2, 1, 2, 1, 1, 2,
+											  1, 2, 2, 2, 2, 1,
+											  2, 2, 1, 2, 2, 2,
+											  2, 2, 2, 2, 2, 1,
+											  1, 1, 1, 2, 2, 2;
+
+	MatrixXd random_num2(5, 6); random_num2 << 1, 2, 1, 1, 2, 2,
+											  1, 1, 2, 2, 2, 1,
+											  1, 2, 2, 2, 1, 2,
+											  1, 1, 1, 2, 1, 1,
+											  2, 1, 1, 1, 1, 2;
+
+	MatrixXd random_num3(5, 6); random_num3 << 1, 2, 1, 1, 2, 2,
+											  2, 1, 2, 1, 2, 2,
+											  2, 1, 1, 2, 2, 1,
+											  2, 1, 2, 1, 2, 2,
+											  2, 2, 1, 1, 1, 1;
+
+	MatrixXd random_num4(5, 6); random_num4 << 1, 2, 2, 1, 1, 2,
+											  2, 1, 1, 2, 1, 2,
+											  2, 1, 2, 2, 2, 1,
+											  2, 1, 1, 2, 1, 1,
+											  1, 1, 2, 1, 2, 1;
+
+	MatrixXd random_num5(5, 6); random_num5 << 2, 1, 2, 2, 2, 1,
+											  1, 1, 1, 2, 1, 1,
+											  2, 1, 1, 2, 2, 1,
+											  2, 2, 1, 1, 1, 1,
+											  2, 1, 1, 2, 1, 1;
+
+	MatrixXd random_num6(5, 6); random_num6 << 1, 2, 1, 2, 2, 1,
+											  2, 1, 1, 1, 1, 2,
+											  1, 1, 2, 1, 1, 1,
+											  1, 1, 1, 1, 1, 2,
+											  2, 2, 2, 1, 1, 1;
+	MatrixXd random_num7(5, 6); random_num7 << 2, 1, 2, 2, 1, 1,
+											  2, 2, 1, 1, 1, 2,
+											  2, 1, 1, 1, 2, 1,
+											  2, 2, 2, 1, 2, 2,
+											  1, 2, 2, 2, 2, 1;
+
+	MatrixXd random_num8(5, 6); random_num8 << 2, 1, 2, 2, 1, 1,
+											  1, 2, 1, 2, 1, 1,
+											  1, 2, 2, 1, 1, 2,
+											  1, 2, 1, 2, 1, 1,
+											  1, 1, 2, 2, 2, 2;
+
+	MatrixXd random_num9(5, 6); random_num9 << 2, 1, 1, 2, 2, 1,
+											  1, 2, 2, 1, 2, 1,
+											  1, 2, 1, 1, 1, 2,
+											  1, 2, 2, 2, 2, 2,
+											  2, 2, 1, 2, 1, 2;
+
+	MatrixXd random_num10(5, 6); random_num10 << 1, 2, 1, 1, 1, 2,
+											     2, 2, 2, 1, 2, 2,
+											     1, 2, 2, 1, 1, 2,
+											     1, 1, 2, 2, 2, 2,
+											     1, 2, 2, 1, 2, 2;
+
+
 	//----------------------------------------------------------
 	// Environmental values
 	// Initializing Stiffness Damping and Inertia
 
 	MatrixXd stiffness(6, 6); stiffness << 0, 0, 0, 0, 0, 0, //toward varun desk
-					0, 10000000, 0, 0, 0, 0, //up
-					0, 0, 0, 0, 0, 0, //out toward workshop
-					0, 0, 0, 1000000, 0, 0,
-					0, 0, 0, 0, 1000000, 0,
-					0, 0, 0, 0, 0, 1000000;
+		0, 10000000, 0, 0, 0, 0, //up
+		0, 0, 0, 0, 0, 0, //out toward workshop
+		0, 0, 0, 1000000, 0, 0,
+		0, 0, 0, 0, 1000000, 0,
+		0, 0, 0, 0, 0, 1000000;
 
 	MatrixXd damping(6, 6); damping << 30, 0, 0, 0, 0, 0,
-					0, 100, 0, 0, 0, 0,
-					0, 0, 30, 0, 0, 0,
-					0, 0, 0, 0.5, 0, 0,
-					0, 0, 0, 0, 0.5, 0,
-					0, 0, 0, 0, 0, 0.5;
+		0, 100, 0, 0, 0, 0,
+		0, 0, 30, 0, 0, 0,
+		0, 0, 0, 0.5, 0, 0,
+		0, 0, 0, 0, 0.5, 0,
+		0, 0, 0, 0, 0, 0.5;
 
-	MatrixXd inertia(6, 6); inertia << 7, 0, 0, 0, 0, 0,
-					0, 0.000001, 0, 0, 0, 0,
-					0, 0, 10, 0, 0, 0,
-					0, 0, 0, 0.0001, 0, 0,
-					0, 0, 0, 0, 0.0001, 0,
-					0, 0, 0, 0, 0, 0.0001;
+	MatrixXd inertia(6, 6); inertia << 10, 0, 0, 0, 0, 0,
+		0, 0.000001, 0, 0, 0, 0,
+		0, 0, 10, 0, 0, 0,
+		0, 0, 0, 0.0001, 0, 0,
+		0, 0, 0, 0, 0.0001, 0,
+		0, 0, 0, 0, 0, 0.0001;
 
 
 
@@ -363,8 +423,8 @@ int main(int argc, char** argv)
 	// First angles of Kuka
 	MatrixXd qdata(6, sample); qdata.setZero(6, sample);//Initializing joint angles
 
-	//************************----------------------------
-	// May be changed
+														//************************----------------------------
+														// May be changed
 	MatrixXd t_sum(6, 1); t_sum.setZero(6, 1);
 	MatrixXd q_sum(6, 1); q_sum.setZero(6, 1);
 	MatrixXd t_ave(6, 1); t_ave << 0, 0, 0, 0, 0, 0;
@@ -423,15 +483,15 @@ int main(int argc, char** argv)
 	double FirstPositionDelta[7] = { 0.0175,0.0175,0.0175,0.0175,0.0175,0.0175,0.0175 }; //maximum deviation from initial position in trajectory from start position in robot(radians)
 
 
-	//Get value for the time step of the command cycle (used for determining max velocity)
-	// sampletime=client.GetTimeStep();
+																						 //Get value for the time step of the command cycle (used for determining max velocity)
+																						 // sampletime=client.GetTimeStep();
 	sampletime = 0.001;
 	fprintf(stdout, "Sample Time:%f seconds\n", sampletime);
 
 	//calculate max step value
 	for (i = 0; i<7; i++)
 	{
-		MaxRadPerStep[i] = sampletime*MaxRadPerSec[i]; //converts angular velocity to discrete time step
+		MaxRadPerStep[i] = sampletime * MaxRadPerSec[i]; //converts angular velocity to discrete time step
 	}
 
 
@@ -494,7 +554,7 @@ int main(int argc, char** argv)
 				//calculate max step value
 				for (i = 0; i < 7; i++)
 				{
-					client.MaxRadPerStep[i] = sampletime*MaxRadPerSec[i]; //converts angular velocity to discrete time step
+					client.MaxRadPerStep[i] = sampletime * MaxRadPerSec[i]; //converts angular velocity to discrete time step
 				}
 
 			}
@@ -504,7 +564,7 @@ int main(int argc, char** argv)
 			memcpy(MJoint, client.GetMeasJoint(), sizeof(double) * 7); //gets the most recent measured joint value
 			memcpy(ETorque, client.GetExtTor(), sizeof(double) * 7);//gets the external torques at the robot joints (supposedly subtracts the torques caused by the robot)
 
-			// Forward Kinematic
+																	// Forward Kinematic
 			theta << MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6];
 
 			MatrixXd A1(4, 4); A1 << cos(theta(0, 0)), -sin(theta(0, 0))*cos(alpha(0, 0)), sin(theta(0, 0))*sin(alpha(0, 0)), a(0, 0)*cos(theta(0, 0)),
@@ -533,11 +593,11 @@ int main(int argc, char** argv)
 				0, 0, 0, 1;
 
 			MatrixXd T01(4, 4); T01 << A1;
-			MatrixXd T02(4, 4); T02 << T01*A2;
-			MatrixXd T03(4, 4); T03 << T02*A3;
-			MatrixXd T04(4, 4); T04 << T03*A4;
-			MatrixXd T05(4, 4); T05 << T04*A5;
-			MatrixXd T06(4, 4); T06 << T05*A6;
+			MatrixXd T02(4, 4); T02 << T01 * A2;
+			MatrixXd T03(4, 4); T03 << T02 * A3;
+			MatrixXd T04(4, 4); T04 << T03 * A4;
+			MatrixXd T05(4, 4); T05 << T04 * A5;
+			MatrixXd T06(4, 4); T06 << T05 * A6;
 
 
 			//*******************--------------------------
@@ -635,12 +695,12 @@ int main(int argc, char** argv)
 			fty = (double)data[1] / 1000000 - zeroy;
 			fty_un = (double)data[1] / 1000000 - zeroy;
 
-			ftx = al*ftx + (1 - al)*ftx_0;
+			ftx = al * ftx + (1 - al)*ftx_0;
 			ftx_0 = ftx;
-			fty = al*fty + (1 - al)*fty_0;
+			fty = al * fty + (1 - al)*fty_0;
 			fty_0 = fty;
 
-			force << ftx,0,fty,0,0,0;
+			force << ftx, 0, fty, 0, 0, 0;
 
 			steady = steady + 1;
 
@@ -660,27 +720,26 @@ int main(int argc, char** argv)
 				flag_finish = 1;
 				q_freeze << q_new;
 			}
-
 			/*if (flag_v == 1)
 			{
-				random_v = rand() % 3 + 1;
-				flag_v = 0;
-				n_v = 0;
-
-				if (random_v == 3)
-				{
-					Vector << random3;
-				}
-				else if (random_v == 2)
-				{
-					Vector << random2;
-				}
-				else
-				{
-					Vector << random1;
-				}
+			random_v = rand() % 3 + 1;
+			flag_v = 0;
+			n_v = 0;
+			if (random_v == 3)
+			{
+			Vector << random3;
+			}
+			else if (random_v == 2)
+			{
+			Vector << random2;
+			}
+			else
+			{
+			Vector << random1;
+			}
 			}*/
 			Vector << random1;
+			random_mat << random_num1;
 
 			if (flag_chosen == 1)
 			{
@@ -717,31 +776,31 @@ int main(int argc, char** argv)
 			}
 			else if (chosen_point == 1)
 			{
-				desired(0) = 0.1;
-				desired(1) = 0.86;
+				desired(0) = 0.06;
+				desired(1) = 0.82;
 			}
 			else if (chosen_point == 2)
 			{
-				desired(0) = -0.1;
-				desired(1) = 0.86;
+				desired(0) = -0.06;
+				desired(1) = 0.82;
 			}
 			else if (chosen_point == 3)
 			{
-				desired(0) = 0.1;
-				desired(1) = 0.66;
+				desired(0) = 0.06;
+				desired(1) = 0.7;
 			}
 			else if (chosen_point == 4)
 			{
-				desired(0) = -0.1;
-				desired(1) = 0.66;
+				desired(0) = -0.06;
+				desired(1) = 0.7;
 			}
 
 
 			//-----------------------------------------------------------
 
-			if (steady > 2000 && -radius_e <= point(0)-desired(0) && point(0)-desired(0) <= radius_e)
+			if (steady > 2000 && -radius_e <= point(0) - desired(0) && point(0) - desired(0) <= radius_e)
 			{
-				if (-radius_e <= point(1)-desired(1) && point(1)-desired(1) <= radius_e)
+				if (-radius_e <= point(1) - desired(1) && point(1) - desired(1) <= radius_e)
 				{
 					steady4++;
 					if (steady4 > 1000)
@@ -761,20 +820,20 @@ int main(int argc, char** argv)
 
 			if (steady < 2000)
 			{
-			    force << 0, 0, 0, 0, 0, 0;
+				force << 0, 0, 0, 0, 0, 0;
 
-			    zerox = al*(double)data[0] / 1000000 + (1 - al)*zerox;
-			    zeroy = al*(double)data[1] / 1000000 + (1 - al)*zeroy;
+				zerox = al * (double)data[0] / 1000000 + (1 - al)*zerox;
+				zeroy = al * (double)data[1] / 1000000 + (1 - al)*zeroy;
 
-			    q_freeze << q_new;
+				q_freeze << q_new;
 
-			 }
+			}
 			// Step 2--------------------
 			//
 			/*if (steady > 6000)
 			{
-				damping(0, 0) = 0;
-				damping(2, 2) = 0;
+			damping(0, 0) = 0;
+			damping(2, 2) = 0;
 			}*/
 			//
 			//----------------------------
@@ -838,18 +897,22 @@ int main(int argc, char** argv)
 
 			if (flag_p < 3)
 			{
-				random_num = rand() % 2 + 1;
+				random_num = rand_mat(i_c, j_c);
+				//random_num = rand() % 2 + 1;
+				t_r = rand() % 6 + 0;
 			}
 
 			if (flag_p == 3)
 			{
-			  steady2++;
-			  flag_ex = 0;
+				steady2++;
+				flag_ex = 0;
 			}
 
-			if (flag_p == 3 && steady2 >= 1000 && cc == 1 && steady > 2000)
+
+
+			if (flag_p == 3 && steady2 >= time_ran(t_r) * 1000 && cc == 1 && steady > 2000)
 			{
-				std::cout << "flag_p"<< std::endl;
+				std::cout << "flag_p" << std::endl;
 				std::cout << flag_p << std::endl;
 				std::cout << "random_num" << std::endl;
 				std::cout << random_num << std::endl;
@@ -933,69 +996,62 @@ int main(int argc, char** argv)
 				// next number----------------------------------
 				if (random_num == 3)
 				{
-					if (rr == 1)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 2;
-							w = 1;
-						}
-					}
-
-					if (rr == 2)
-					{
-						x_incr << 0, 0, mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
-						perturb_flag = 7;
-						if (w == dur)
-						{
-							cc = 0;
-							x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
-							x_03 << x_e;
-							x_003 << x_e;
-							x_new << x_e;
-						}
-					}
-
-					qc << Ja.inverse()*(x_incr - x_incr_0);
-					delta_q << delta_q + qc;
-					q_new << q_freeze + delta_q;
-					x_incr_0 << x_incr;
-
+				if (rr == 1)
+				{
+				x_incr << 0, 0, 0, 0, 0, 0;
+				if (w == 1)
+				{
+				rr = 2;
+				w = 1;
 				}
-
+				}
+				if (rr == 2)
+				{
+				x_incr << 0, 0, mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
+				perturb_flag = 7;
+				if (w == dur)
+				{
+				cc = 0;
+				x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
+				x_03 << x_e;
+				x_003 << x_e;
+				x_new << x_e;
+				}
+				}
+				qc << Ja.inverse()*(x_incr - x_incr_0);
+				delta_q << delta_q + qc;
+				q_new << q_freeze + delta_q;
+				x_incr_0 << x_incr;
+				}
 				// next number----------------------------------
 				if (random_num == 4)
 				{
-					if (rr == 1)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 2;
-							w = 1;
-						}
-					}
-
-					if (rr == 2)
-					{
-						x_incr << 0, 0, -mag * (10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
-						perturb_flag = 7;
-						if (w == dur)
-						{
-							cc = 0;
-							x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
-							x_03 << x_e;
-							x_003 << x_e;
-							x_new << x_e;
-						}
-					}
-
-					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
-					delta_q << delta_q + qc;
-					q_new << q_freeze + delta_q;
-					x_incr_0 << x_incr;
-
+				if (rr == 1)
+				{
+				x_incr << 0, 0, 0, 0, 0, 0;
+				if (w == 1)
+				{
+				rr = 2;
+				w = 1;
+				}
+				}
+				if (rr == 2)
+				{
+				x_incr << 0, 0, -mag * (10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
+				perturb_flag = 7;
+				if (w == dur)
+				{
+				cc = 0;
+				x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
+				x_03 << x_e;
+				x_003 << x_e;
+				x_new << x_e;
+				}
+				}
+				qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
+				delta_q << delta_q + qc;
+				q_new << q_freeze + delta_q;
+				x_incr_0 << x_incr;
 				}*/
 
 				w = w + 1;
@@ -1008,9 +1064,9 @@ int main(int argc, char** argv)
 
 			if (flag_p2 == 1)
 			{
-			  steady3++;
+				steady3++;
 			}
-			if (steady3 > 1000)
+			if (steady3 > 4000)
 			{
 				flag_I = 1;
 				flag_chosen = 1;
@@ -1034,36 +1090,36 @@ int main(int argc, char** argv)
 			//----------------------------------------------
 
 
-			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %d %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), perturb_flag, x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5));
+			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %d %lf %lf %lf %lf %lf %lf %lf %lf %lf %d %d %d\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), perturb_flag, x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5), damping(0, 0), desired(0), desired(1), trigger, chosen, random_num);
 
 			// Use commanded x--------------------------------------------------------------------------
 			x_003 << x_03;
 			x_03 << x_new;
-			x_new << (inertia/(0.000001) + damping/(0.001) + stiffness).inverse()*(force + (inertia/(0.000001))*(x_03 - x_003) + stiffness*(x_e - x_03)) + x_03;
+			x_new << (inertia / (0.000001) + damping / (0.001) + stiffness).inverse()*(force + (inertia / (0.000001))*(x_03 - x_003) + stiffness * (x_e - x_03)) + x_03;
 
-				//------------------------------------------------------------------------------------------
+			//------------------------------------------------------------------------------------------
 
 			if (steady > 2000)
 			{
-			    if (x_new(2) >= 0.94)
-			    {
-			      x_new(2) = 0.94;
-			    }
+				if (x_new(2) >= 0.94)
+				{
+					x_new(2) = 0.94;
+				}
 
-			    if (x_new(2) <= 0.58)
-			    {
-			      x_new(2) = 0.58;
-			    }
+				if (x_new(2) <= 0.58)
+				{
+					x_new(2) = 0.58;
+				}
 
-			    if (x_new(0) >= 0.18)
-			    {
-			      x_new(0) = 0.18;
-			    }
+				if (x_new(0) >= 0.18)
+				{
+					x_new(0) = 0.18;
+				}
 
-			    if (x_new(0) <= -0.18)
-			    {
-			      x_new(0) = -0.18;
-			    }
+				if (x_new(0) <= -0.18)
+				{
+					x_new(0) = -0.18;
+				}
 			}
 
 			if (trigger == 1)
@@ -1081,12 +1137,12 @@ int main(int argc, char** argv)
 
 			if (steady < 2000)
 			{
-			    q_new(0) = -1.5708;
-			    q_new(1) = 1.5708;
-			    q_new(2) = 0;
-			    q_new(3) = 1.5708;
-			    q_new(4) = 0;
-			    q_new(5) = -1.5708;
+				q_new(0) = -1.5708;
+				q_new(1) = 1.5708;
+				q_new(2) = 0;
+				q_new(3) = 1.5708;
+				q_new(4) = 0;
+				q_new(5) = -1.5708;
 			}
 
 			if (flag_finish == 1)
@@ -1107,12 +1163,12 @@ int main(int argc, char** argv)
 			// Step 4-------------------------------------
 			if (w == dur + 1)
 			{
-			  trigger = 1;
-			  q_freeze << q_new;
-			  delta_q << 0, 0, 0, 0, 0, 0;
-			  x_new << x_e;
-			  w = 0;
-			  flag_p2 = 1;
+				trigger = 1;
+				q_freeze << q_new;
+				delta_q << 0, 0, 0, 0, 0, 0;
+				x_new << x_e;
+				w = 0;
+				flag_p2 = 1;
 			}
 			//---------------------------------------------
 			/*client.NextJoint[0] = -1.5708;
@@ -1134,6 +1190,7 @@ int main(int argc, char** argv)
 			xy_coord[7] = P_ex(0);
 			xy_coord[8] = P_ex(1);
 			xy_coord[9] = ex_r;
+			xy_coord[10] = damping(0, 0);
 			udp_server.Send(xy_coord, 16);
 
 
