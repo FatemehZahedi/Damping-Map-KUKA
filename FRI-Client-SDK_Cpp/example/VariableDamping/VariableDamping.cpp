@@ -24,7 +24,7 @@ using namespace Eigen;
 #define DEFAULT_IP "192.170.10.2"
 
 /* GUI UDP Server Address/Port */
-const std::string 	udp_addr_gui("192.168.0.103");
+const std::string 	udp_addr_gui("192.168.0.104");
 const int 			udp_port_gui = 50000;
 
 FILE *NewDataFile(void);
@@ -125,11 +125,17 @@ int main(int argc, char** argv)
 	
 
 	/* Variables related to defining target*/
-	int mode = 2;
+	int mode = 1;
 	int flag_p = 0;
 	MatrixXd desired(2, 1); desired << 0, 0.76;
 	MatrixXd point(2, 1); point << 0, 0;
 	MatrixXd P_ex(2, 1); P_ex << 0, 0;
+
+	/* Variables related to defining new trial*/
+	int steady2 = 0;
+	int start_trial = 0;
+	int flag_count = 1;
+
 
 	// parse command line arguments
 	const char* hostname = (argc >= 3) ? argv[2] : DEFAULT_IP; //optional command line argument for ip address (default is for KONI)
@@ -384,6 +390,15 @@ int main(int argc, char** argv)
 				P_ex(1) = desired(1);
 			}
 
+			if (start_trial == 0)
+			{
+				mode = 1;
+			}
+			else
+			{
+				mode = 2;
+			}
+
 			if (flag_p == 0 && -radius_e <= point(0) - P_ex(0) && point(0) - P_ex(0) <= radius_e)
 			{
 				flag_p++;
@@ -395,11 +410,24 @@ int main(int argc, char** argv)
 			else if (flag_p == 2 && -radius_e <= point(0) - P_ex(0) && point(0) - P_ex(0) <= radius_e)
 			{
 				flag_p = 0;
+				flag_count = 1;
+				start_trial = 0;
+			}
+			if (flag_count == 1)
+			{
+				steady2++;
+			}
+
+			if (steady2 == 5000)
+			{
+				flag_count = 0;
+				steady2 = 0;
+				start_trial = 1;
 			}
 
 			damping(0,0) = b_var;
 
-			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5));
+			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %lf %lf %lf %lf %lf %lf %d %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5), mode, damping(0,0));
 
 			// Shift old position/pose vectors, calculate new
 			x_oldold << x_old;
