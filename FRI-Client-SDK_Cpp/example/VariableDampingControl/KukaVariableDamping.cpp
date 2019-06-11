@@ -13,6 +13,7 @@
 #include <sys/shm.h>
 #include <eigen3/Eigen/Dense>
 #include "UdpServer.h"
+#include "TrignoEmgClient.h"
 
 
 using namespace std;
