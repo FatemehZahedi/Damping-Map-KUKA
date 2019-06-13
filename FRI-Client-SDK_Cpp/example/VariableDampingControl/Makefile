@@ -4,7 +4,8 @@ include $(BASE_DIR)/build/GNUMake/$(TOOLS_MAK)
 
 # ---------------- HDF ----------------------
 HDF_INSTALL = /usr/local/hdf5
-HDF_LIB 	= $(HDF_INSTALL)/lib64
+#HDF_LIB 	= $(HDF_INSTALL)/lib64			# KUKA Computer
+HDF_LIB 	= $(HDF_INSTALL)/lib			# Tanner's laptop
 HDF_INCLUDE = -I$(HDF_INSTALL)/include
 HDF_LIBS 	= -L$(HDF_LIB)	\
 			  -lhdf5_cpp	\

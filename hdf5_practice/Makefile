@@ -1,7 +1,9 @@
 # Edit the following variables as needed
 HDF_INSTALL = /usr/local/hdf5
-EXTLIB      = -L$(HDF_INSTALL)/lib64
-HDFLIB      = $(HDF_INSTALL)/lib64
+# EXTLIB      = -L$(HDF_INSTALL)/lib64		# KUKA Computer
+EXTLIB		= -L$(HDF_INSTALL)/lib 			# Tanner's Laptop
+# HDFLIB      = $(HDF_INSTALL)/lib64		# KUKA Computer
+HDFLIB		= $(HDF_INSTALL)/lib			# Tanner's Laptop
 CC          = g++
 CFLAGS      =
 LIB         = -lz -lm -ldl #-lsz
