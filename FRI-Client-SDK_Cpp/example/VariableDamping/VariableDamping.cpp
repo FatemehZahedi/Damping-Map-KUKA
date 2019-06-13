@@ -24,7 +24,7 @@ using namespace Eigen;
 #define DEFAULT_IP "192.170.10.2"
 
 /* GUI UDP Server Address/Port */
-const std::string 	udp_addr_gui("192.168.0.104");
+const std::string 	udp_addr_gui("192.168.0.100");
 const int 			udp_port_gui = 50000;
 
 FILE *NewDataFile(void);
@@ -55,8 +55,8 @@ int main(int argc, char** argv)
 
 	/* Variables related to variable dampings*/
 	float dt = 0.001;
-	double kp = 2.0;
-	double kn = 2.0;
+	double kp = 63.48;
+	double kn = 32.81;
 	double b_var;					// Variable damping
 	double b_LB = -20;				// Lower bound of damping
 	double b_UB = 10;				// Upper bound of damping
@@ -125,7 +125,7 @@ int main(int argc, char** argv)
 	
 
 	/* Variables related to defining target*/
-	int mode = 1;
+	int mode = 2;
 	int flag_p = 0;
 	MatrixXd desired(2, 1); desired << 0, 0.76;
 	MatrixXd point(2, 1); point << 0, 0;
@@ -134,7 +134,9 @@ int main(int argc, char** argv)
 	/* Variables related to defining new trial*/
 	int steady2 = 0;
 	int start_trial = 0;
-	int flag_count = 1;
+	int flag_count = 0;
+	int flag_p_old;
+	int steady_out=0;
 
 
 	// parse command line arguments
@@ -374,14 +376,14 @@ int main(int argc, char** argv)
 			    q_init << q_new;
 			 }
 
-			if (flag_p == 0)
+			if (flag_p == 1)
 			{
-				P_ex(0) = desired(0) + 0.15;
+				P_ex(0) = desired(0) + 0.06;
 				P_ex(1) = desired(1);
 			}
-			else if (flag_p == 1)
+			else if (flag_p == 2)
 			{
-				P_ex(0) = desired(0) - 0.15;
+				P_ex(0) = desired(0) - 0.06;
 				P_ex(1) = desired(1);
 			}
 			else
@@ -390,44 +392,51 @@ int main(int argc, char** argv)
 				P_ex(1) = desired(1);
 			}
 
-			if (start_trial == 0)
-			{
-				mode = 1;
-			}
-			else
-			{
-				mode = 2;
-			}
 
-			if (flag_p == 0 && -radius_e <= point(0) - P_ex(0) && point(0) - P_ex(0) <= radius_e)
+			if (flag_p == 1 && -radius_e <= point(0) - P_ex(0) && point(0) - P_ex(0) <= radius_e)
 			{
-				flag_p++;
-			}
-			else if (flag_p == 1 && -radius_e <= point(0) - P_ex(0) && point(0) - P_ex(0) <= radius_e)
-			{
-				flag_p++;
+				flag_count = 1;
+				flag_p_old = 1;
 			}
 			else if (flag_p == 2 && -radius_e <= point(0) - P_ex(0) && point(0) - P_ex(0) <= radius_e)
 			{
-				flag_p = 0;
 				flag_count = 1;
-				start_trial = 0;
+				flag_p_old = 2;
+			}
+			else if (flag_p == 0 && -radius_e <= point(0) - P_ex(0) && point(0) - P_ex(0) <= radius_e)
+			{
+				steady_out++;
 			}
 			if (flag_count == 1)
 			{
 				steady2++;
 			}
 
-			if (steady2 == 5000)
+			if (steady2 == 2000)
 			{
 				flag_count = 0;
 				steady2 = 0;
-				start_trial = 1;
+				start_trial = 0;
+				flag_p = 0;
+			}
+			
+			if (steady_out == 500)
+			{
+			  if (flag_p_old == 1)
+			  {
+			    flag_p = 2;
+			  }
+			  else if (flag_p_old == 2)
+			  {
+			    flag_p = 1;
+			  }
+			  start_trial = 1;
+			  steady_out = 0;
 			}
 
 			damping(0,0) = b_var;
 
-			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %lf %lf %lf %lf %lf %lf %d %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5), mode, damping(0,0));
+			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %lf %lf %lf %lf %lf %lf %lf %lf %d %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5), xdot_filt(0), xdotdot_filt(0), start_trial, damping(0,0));
 
 			// Shift old position/pose vectors, calculate new
 			x_oldold << x_old;
@@ -497,6 +506,8 @@ int main(int argc, char** argv)
 			{
 				b_var = -(2 * b_UB / (1 + exp(-kn * xdot_filt(0)*xdotdot_filt(0))) - b_UB);
 			}
+			
+			//b_var = -20;
 
 			// Send data to visualizer gui
 			xy_coord[0] = mode;
