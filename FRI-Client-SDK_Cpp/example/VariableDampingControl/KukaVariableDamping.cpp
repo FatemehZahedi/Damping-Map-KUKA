@@ -14,7 +14,10 @@
 #include <eigen3/Eigen/Dense>
 #include "UdpServer.h"
 #include "TrignoEmgClient.h"
+#include "SubjectMetadataParser.h"
+#include "H5FunctionsNMCHRL.h"
 
+#define GetVarName(Variable) (#Variable);
 
 using namespace std;
 using namespace KUKA::FRI;
@@ -28,18 +31,131 @@ using namespace Eigen;
 const std::string 	udp_addr_gui("192.168.0.103");
 const int 			udp_port_gui = 50000;
 
-FILE *NewDataFile(void);
-
 
 /* Shared Memory Function Prototype */
 template<typename T>
 T * InitSharedMemory(std::string shmAddr, int nElements);
 
 
-
 // Main
 int main(int argc, char** argv)
 {
+	/* HDF5 File */
+	bool useDefaultH5File = true;
+	SubjectMetadata smds;
+	H5File * fileH5 = new H5File();
+	Group * groupSubject = new Group();
+	Group * groupTrial = new Group();
+	std::string h5filename;
+	std::string groupSubjectName;
+	std::string groupTrialName;
+
+
+	/* Command line arguments */
+	if (argc == 1){
+		/* No subject metadata file given */
+		useDefaultH5File = true;
+	}
+	else if (argc ==2){
+		std::string metadataFile = argv[1];
+		useDefaultH5File = !(ParseSubjectMetadataFile(smds, metadataFile));
+	}
+	else{
+		/* Too much Info */
+		printf("Use: KukaVariableDamping <optional subject metadata file>\n");
+		return 0;
+	}
+
+	/* Create or Open H5 File */
+	if (useDefaultH5File){
+		h5filename = "KukaData.h5";
+	}
+	else{
+		h5filename = smds.H5File;
+	}
+	fileH5 = CreateOrOpenFile(h5filename);
+
+	/* Create Subject Group */
+	if (useDefaultH5File){
+		time_t rawtime;
+		struct tm *timeinfo;
+		char namer[40];
+
+		time(&rawtime);
+		timeinfo = localtime(&rawtime);
+		strftime(namer, 40, "Data_%Y-%j-%H_%M_%S", timeinfo);//creates a file name that has year-julian day-hour min second (unique for each run, no chance of recording over previous data)
+
+		groupSubjectName = std::string(namer);
+		groupSubject = CreateOrOpenGroup(groupSubjectName);
+	}
+	else{
+		groupSubjectName = "Subject" + std::to_string(smds.Number);
+		groupSubject = CreateOrOpenGroup(groupSubjectName);
+		/* Create subject attributes */
+		CreateNumericAttribute(groupSubject, "Number", smds.Number);
+		CreateStringAttribute(groupSubject, "Name", smds.Name);
+		CreateNumericAttribute(groupSubject, "Age", smds.Age);
+		CreateNumericAttribute(groupSubject, "Height", smds.Height);
+		CreateNumericAttribute(groupSubject, "Weight", smds.Weight);
+		CreateStringAttribute(groupSubject, "Gender", smds.Gender);
+	}
+
+	/* Set up buffers to collect data */
+	int nPages = 2;
+	int nRows = 10000;
+
+	int bufferFillCount = 0;
+	int activePage = 0;		// each buffer has 2 "pages" of 10000xn elements.  One page collects data, while the other is written to the hdf5 file. Whenever a write occurs, these pages switch
+
+	int pflagCols = 1;
+	int	jointAngleCols = 7;
+	int forceCols = 6;
+	int poseCols = 6;
+
+	int perturbFlagBuff[nPages][nRows][pflagCols];
+	double jointAngleBuff[nPages]nRows][jointAngleCols];
+	double forceBuff[nPages][nRows][forceCols];
+	double poseBuff[nPages][nRows][poseCols];
+
+	/* initialize datasets */
+
+	/* Perturb Flag */
+	int dsetCount = 0;
+	std::string dsetName = "PerturbFlag_Set" + std::to_string(dsetCount);
+	while (groupSubject->exists(dsetName)){
+		dsetCount++;
+		dsetName = "PerturbFlag_Set" + std::to_string(dsetCount);
+	}
+	DataSet dsPerturbFlag = InitDataSet2D(groupSubject, dsetName, (hsize_t) pflagCols, PredType::NATIVE_INT);
+
+	/* Joint Angles */
+	int dsetCount = 0;
+	std::string dsetName = "JointAngle_Set" + std::to_string(dsetCount);
+	while (groupSubject->exists(dsetName)){
+		dsetCount++;
+		dsetName = "JointAngle_" + std::to_string(dsetCount);
+	}
+	DataSet dsJointAngle = InitDataSet2D(groupSubject, dsetName, (hsize_t) jointAngleCols, PredType::NATIVE_DOUBLE);
+
+	/* Forces */
+	int dsetCount = 0;
+	std::string dsetName = "Force_Set" + std::to_string(dsetCount);
+	while (groupSubject->exists(dsetName)){
+		dsetCount++;
+		dsetName = "Force_Set" + std::to_string(dsetCount);
+	}
+	DataSet dsForce = InitDataSet2D(groupSubject, dsetName, (hsize_t) forceCols, PredType::NATIVE_DOUBLE);
+
+	/* Pose */
+	int dsetCount = 0;
+	std::string dsetName = "Pose_Set" + std::to_string(dsetCount);
+	while (groupSubject->exists(dsetName)){
+		dsetCount++;
+		dsetName = "Pose_Set" + std::to_string(dsetCount);
+	}
+	DataSet dsPose = InitDataSet2D(groupSubject, dsetName, (hsize_t) poseCols, PredType::NATIVE_DOUBLE);
+
+
 	// UDP Server address and port hardcoded now -- change later
 	UDPServer udp_server(udp_addr_gui, udp_port_gui);
 
@@ -127,10 +243,6 @@ int main(int argc, char** argv)
 
 	// connect client application to KUKA Sunrise controller
 	app.connect(port, hostname);
-
-
-	//create file for output
-	FILE * OutputFile = NewDataFile();
 
 
 	// Initial Joint Angles
@@ -327,7 +439,80 @@ int main(int argc, char** argv)
 			    q_init << q_new;
 			 }
 
-			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5));
+			 /* Will be replaced by HDF5 File stuff
+			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %lf %lf %lf %lf %lf %lf\n",
+								count,
+								MJoint[0],
+								MJoint[1],
+								MJoint[2],
+								MJoint[3],
+								MJoint[4],
+								MJoint[5],
+								MJoint[6],
+								force(0),
+								force(2),
+								x_new(0),
+								x_new(1),
+								x_new(2),
+								x_new(3),
+								x_new(4),
+								x_new(5));
+			*/
+			/* Fill data buffers and write if necessary */
+			memcpy(&(perturbFlagBuff[activePage][bufferFillCount][0]), &count, sizeof(int)*pflagCols);
+			memcpy(&(JointAngleBuff[activePage][bufferFillCount][0]), MJoint, sizeof(double)*jointAngleCols);
+			memcpy(&(forceBuff[activePage][bufferFillCount][0]), force.data(), sizeof(double)*forceCols);
+			memcpy(&(poseBuff[activePage][bufferFillCount][0]), x_new.data(), sizeof(double)*poseCols);
+
+			bufferFillCount++;
+			if (bufferFillCount == nRows){
+				/* Write perturb flag */
+				std::thread t1(AppendToDataSet2D,
+							   std::ref(dsPerturbFlag),
+							   &(perturbFlagBuff[activePage][0][0]),
+							   bufferFillCount,
+							   pflagCols,
+							   PredType::NATIVE_INT);
+				t1.detach();
+
+				/* Write Joint Angle */
+				std::thread t2(AppendToDataSet2D,
+							   std::ref(dsJointAngle),
+							   &(jointAngleBuff[activePage][0][0]),
+							   bufferFillCount,
+							   jointAngleCols,
+							   PredType::NATIVE_DOUBLE);
+				t2.detach();
+
+				/* Write Forces */
+				std::thread t3(AppendToDataSet2D,
+							   std::ref(dsForce),
+							   &(forceBuff[activePage][0][0]),
+							   bufferFillCount,
+							   forceCols,
+							   PredType::NATIVE_DOUBLE);
+				t3.detach();
+
+				/* Write Pose */
+				std::thread t4(AppendToDataSet2D,
+							   std::ref(dsPose),
+							   &(poseBuff[activePage][0][0]),
+							   bufferFillCount,
+							   poseCols,
+							   PredType::NATIVE_DOUBLE);
+				t4.detach();
+
+				/* Reset counters */
+				bufferFillCount = 0;
+				if (activePage == 0){
+					activePage = 1;
+				}
+				else if (activePage == 1){
+					activePage = 0;
+				}
+			}
+
+
 
 			// Shift old position/pose vectors, calculate new
 			x_oldold << x_old;
@@ -386,8 +571,6 @@ int main(int argc, char** argv)
 	}
 
 	// Dead code but useful (maybe in future)
-	fclose(OutputFile);
-	fprintf(stdout, "File closed.\n\n\n");
 	usleep(10000000);//microseconds //wait for close on other side
 
 	// disconnect from controller
@@ -395,23 +578,6 @@ int main(int argc, char** argv)
 
 	return 1;
 }
-
-
-
-FILE *NewDataFile(void) //this may be specific to linux OS
-{
-	FILE *fp;
-	time_t rawtime;
-	struct tm *timeinfo;
-	char namer[40];
-
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(namer, 40, "Output%Y-%j-%H_%M_%S.txt", timeinfo);//creates a file name that has year-julian day-hour min second (unique for each run, no chance of recording over previous data)
-	fp = fopen(namer, "w");//open output file
-	return fp;
-}
-
 
 // Shared Memory-------------------------------------------------------
 template<typename T>

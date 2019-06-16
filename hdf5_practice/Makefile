@@ -8,7 +8,7 @@ CC          = g++
 CFLAGS      =
 LIB         = -lz -lm -ldl #-lsz
 
-TARGET = h5_practice
+TARGET = h5_twobuffer
 
 INCLUDE   = -I$(HDF_INSTALL)/include
 LIBSHDF   = $(EXTLIB) -lhdf5_cpp \
