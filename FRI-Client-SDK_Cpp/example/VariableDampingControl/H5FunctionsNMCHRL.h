@@ -4,32 +4,32 @@
 using namespace H5;
 
 
-H5File CreateOrOpenFile(const std::string & filename){
+H5File * CreateOrOpenH5File(const std::string & filename){
     Exception::dontPrint();
-    H5File file();
+    H5File * file = 0;
 
     try{
         /* Open file if it exists */
-        file = H5File(filename.c_str(), H5F_ACC_RDWR);
+        file = new H5File(filename.c_str(), H5F_ACC_RDWR);
     }
     catch(const FileIException&){
         /* Create file if it does not exist */
-        file = H5File(filename.c_str(), H5F_ACC_TRUNC);
+        file = new H5File(filename.c_str(), H5F_ACC_TRUNC);
     }
 
     return file;
 }
 
-Group CreateOrOpenGroup(H5Location * h5loc, H5std_string & group_name){
+Group * CreateOrOpenGroup(H5Location * h5loc, H5std_string & group_name){
 
     Exception::dontPrint();
-    Group group();
+    Group * group = 0;
 
     try{
         /* Open group if it exists */
-        group = Group(h5loc->openGroup(group_name));
+        group = new Group(h5loc->openGroup(group_name));
     } catch(Exception & e){
-        group = Group(h5loc->createGroup(group_name));
+        group = new Group(h5loc->createGroup(group_name));
     }
 
     return group;

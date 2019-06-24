@@ -7,20 +7,21 @@ include $(BASE_DIR)/build/GNUMake/$(TOOLS_MAK)
 ###############################################################
 
 # ---------------- Boost ----------------------
-BOOST_DIR = /home/tannerbitz/Documents/cpp/boost_1_68_0 	# Tanner's Laptop
-# BOOST_DIR = /usr/include/boost_1_70_0						# KUKA Computer
+# BOOST_DIR = /home/tannerbitz/Documents/cpp/boost_1_68_0 	# Tanner's Laptop
+BOOST_DIR = /usr/include/boost_1_70_0						# KUKA Computer
 CXXFLAGS 	+= 	-std=c++11 -pthread
 BOOST_INC 	= 	-I/usr/local/include $(BOOST_DIR)
 BOOST_LIB 	= 	-L/usr/local/lib/ 	\
 				-lboost_system 		\
 				-lpthread 			\
 				-lboost_thread 		\
-				-lboost_chrono
+				-lboost_chrono	\
+				-lboost_filesystem
 
 # ---------------- HDF ----------------------
 HDF_INSTALL = /usr/local/hdf5
-HDF_LIB 	= $(HDF_INSTALL)/lib			# Tanner's laptop
-#HDF_LIB 	= $(HDF_INSTALL)/lib64			# KUKA Computer
+# HDF_LIB 	= $(HDF_INSTALL)/lib			# Tanner's laptop
+HDF_LIB 	= $(HDF_INSTALL)/lib64			# KUKA Computer
 HDF_INCLUDE = -I$(HDF_INSTALL)/include
 HDF_LIBS 	= -L$(HDF_LIB)	\
 			  -lhdf5_cpp	\
@@ -38,8 +39,7 @@ HDF_LIBS 	= -L$(HDF_LIB)	\
 SOURCES 	= KukaVariableDamping.cpp	\
 			  PositionControlClient.cpp	\
 			  UdpServer.cpp				\
-			  TrignoEmgClient.cpp		\
-			  SubjectMetadataParser.cpp
+			  TrignoEmgClient.cpp		
 
 TARGET 		= KukaVariableDamping
 

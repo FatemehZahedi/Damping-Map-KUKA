@@ -47,10 +47,11 @@ const int 			udp_port_gui = 50000;
 /* Shared Memory Function Prototype */
 template<typename T>
 T * InitSharedMemory(std::string shmAddr, int nElements);
-ofstream CreateKukaDataFile(path kukaDataFilePath)
+void CreateOrOpenKukaDataFile(boost::filesystem::ofstream & ofs, path kukaDataFilePath);
+
 
 enum class DampingMode{
-	POSTIIVE = 1,
+	POSITIVE = 1,
 	NEGATIVE,
 	VARIABLE,
 	ZERO
@@ -59,7 +60,7 @@ enum class DampingMode{
 enum class TargetPosition{
 	NEUTRAL = 0,
 	LEFT,	// 1
-	RIGHT	// 2
+	RIGHT,	// 2
 	DOWN,  	// 3
 	UP,		// 4
 };
@@ -101,11 +102,11 @@ int main(int argc, char** argv)
 	}
 
 	/* Check Inputted Group Number */
-	if (groupNumber >= (int) groupDampingMode.size() || groupNumber < 0){
+	if (groupNumber >= (int) groupDampingModes.size() || groupNumber < 0){
 		printf("Group Number Out of Acceptable Range\n");
 		printf("Inputted Group Number: %d\n", groupNumber);
 		printf("Min: 0\n");
-		printf("Max: %d\n", (int) groupDampingMode.size());
+		printf("Max: %d\n", (int) groupDampingModes.size());
 		exit(1);
 	}
 	else{
@@ -130,10 +131,10 @@ int main(int argc, char** argv)
 
 	std::string argKey;
 	std::string argVal;
-	while (int iArg=3; iArg<argc-1; iArg++){
+	for (int iArg=3; iArg<(argc-1); iArg+=2){
 		/* get key and val */
-		argKey = argv[i];
-		argVal = argv[i+1];
+		argKey = std::string(argv[iArg]);
+		argVal = std::string(argv[iArg+1]);
 		/* set key uppercase */
 		std::transform(argKey.begin(), argKey.end(), argKey.begin(), ::toupper);
 
@@ -184,11 +185,11 @@ int main(int argc, char** argv)
 	}
 
 	/* Check EMG use */
-	TrignoEmgClient emgClient();
+	TrignoEmgClient emgClient;
 	if (useEmg){
 		emgClient.SetIpAddress(emgIpAddr);
-		int nEmgs = 4;
-		int emgList[nEmgs] = [1,2,3,4];
+		const int nEmgs = 4;
+		int emgList[nEmgs] = {1,2,3,4};
 		emgClient.SetEmgToSave(emgList, nEmgs);
 		emgClient.ConnectDataPort();
 		emgClient.ConnectCommPort();
@@ -210,17 +211,17 @@ int main(int argc, char** argv)
 	create_directory(p_subject);
 	// group directory
 	std::string groupDir = "Group" + std::to_string(groupNumber);
-	path p_group = p_subject /= groupDir
+	path p_group = p_subject /= path(groupDir);
 	create_directory(p_subject);
 
 	std::string trialDir;
 	path p_trial;
 	path p_kukadata;
 	path p_emgdata;
-	ofstream kukaDataFileStream;
+	boost::filesystem::ofstream kukaDataFileStream;
 
 	/* HDF5 File */
-	H5File fileH5 = H5File();
+	H5File * fileH5 = new H5File();
 	std::string emgfilename = "EmgData.h5";
 
 	/* Kuka Data File */
@@ -635,18 +636,20 @@ int main(int argc, char** argv)
 								create_directory(p_trial);
 
 								/* Create kuka data trial files */
-								p_kukadata = p_trial /= Path(kukafilename);
-								kukaDataFileStream = CreateKukaDataFile(p_kukadata);
+								p_kukadata = p_trial /= path(kukafilename);
+								CreateOrOpenKukaDataFile(kukaDataFileStream, p_kukadata);
 
 								/* Create emg hdf5 file */
 								if (useEmg){
 									p_emgdata = p_trial /= path(emgfilename);
-									h5file = CreateOrOpenH5File(p_emgdata.string());
-									emgClient.StartWriting(&h5file);
+									fileH5->close();
+									delete fileH5;
+									fileH5 = CreateOrOpenH5File(p_emgdata.string());
+									emgClient.StartWriting(fileH5);
 								}
 							}
 							 else{
-								 enough = true;		// ends group of trials
+								enough = true;		// ends group of trials
 							 }
 							 trialNumber++;
 						 }
@@ -761,7 +764,9 @@ int main(int argc, char** argv)
 	app.disconnect();
 	sleep(0.5);
 	if (useEmg){
-		client.StopReceiveDataStream();
+		fileH5->close();
+		delete fileH5;
+		emgClient.StopReceiveDataStream();
 	}
 	sleep(0.5);
 
@@ -771,7 +776,7 @@ int main(int argc, char** argv)
 }
 
 
-ofstream CreateKukaDataFile(path kukaDataFilePath){
+void CreateOrOpenKukaDataFile(boost::filesystem::ofstream & ofs, path kukaDataFilePath){
 	/* deconstruct kuka file path into path, filename, extension */
 	path pp = kukaDataFilePath.parent_path();
 	path fname_stem = kukaDataFilePath.stem();
@@ -791,8 +796,8 @@ ofstream CreateKukaDataFile(path kukaDataFilePath){
 	}
 
 	/* Make file stream */
-	ofstream ofs(kukaDataFilePath);
-	return ofs;
+	ofs.close();
+	ofs.open(kukaDataFilePath);
 }
 
 
