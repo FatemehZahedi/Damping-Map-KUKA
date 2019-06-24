@@ -14,18 +14,30 @@
 #include <eigen3/Eigen/Dense>
 #include "UdpServer.h"
 #include "TrignoEmgClient.h"
-#include "SubjectMetadataParser.h"
 #include "H5FunctionsNMCHRL.h"
+#include <algorithm>
+/* Boost filesystem */
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/path.hpp>
+/* HDF5 */
+#include "H5Cpp.h"
 
-#define GetVarName(Variable) (#Variable);
 
 using namespace std;
 using namespace KUKA::FRI;
 using namespace Eigen;
+using namespace boost::filesystem;
+using namespace H5;
+
 
 /* IP Address/Port for KONI Connection */
 #define DEFAULT_PORTID 30200
 #define DEFAULT_IP "192.170.10.2"
+
+#define DEFAULT_GROUPNUMBER 0
+#define DEFAULT_TRIALNUMBER 0
+
 
 /* GUI UDP Server Address/Port */
 const std::string 	udp_addr_gui("192.168.0.103");
@@ -35,129 +47,185 @@ const int 			udp_port_gui = 50000;
 /* Shared Memory Function Prototype */
 template<typename T>
 T * InitSharedMemory(std::string shmAddr, int nElements);
+ofstream CreateKukaDataFile(path kukaDataFilePath)
+
+enum class DampingMode{
+	POSTIIVE = 1,
+	NEGATIVE,
+	VARIABLE,
+	ZERO
+};
+
+enum class TargetPosition{
+	NEUTRAL = 0,
+	LEFT,	// 1
+	RIGHT	// 2
+	DOWN,  	// 3
+	UP,		// 4
+};
 
 
 // Main
 int main(int argc, char** argv)
 {
-	/* HDF5 File */
-	bool useDefaultH5File = true;
-	SubjectMetadata smds;
-	H5File * fileH5 = new H5File();
-	Group * groupSubject = new Group();
-	Group * groupTrial = new Group();
-	std::string h5filename;
-	std::string groupSubjectName;
-	std::string groupTrialName;
+	/* Setup damping modes */
+	std::vector<int> groupDampingModes 	= {4,4,2,3,1,3,3,2,2,1,3,3,1,2,2,1,1};
+	std::vector<int> groupDirectionSeq 	= {1,2,1,1,4,0,4,0,4,3,2,3,1,2,3,2,0};
 
+	const int nTrialsPerGroup = 10;
+	Matrix<int,5,nTrialsPerGroup> directionSequences;
+	directionSequences << 1, 1, 0, 0, 0, 0, 1, 0, 1, 0,
+						  0, 0, 1, 1, 1, 1, 0, 0, 1, 0,
+						  0, 0, 1, 0, 1, 1, 0, 0, 1, 1,
+						  1, 0, 1, 0, 1, 0, 0, 1, 1, 1,
+						  1, 1, 0, 1, 0, 0, 0, 0, 1, 1;
+	Matrix<int,1,nTrialsPerGroup> trialDirSeq;
+	DampingMode groupDamping;
 
 	/* Command line arguments */
-	if (argc == 1){
-		/* No subject metadata file given */
-		useDefaultH5File = true;
+	if (argc < 3){
+		printf("Use: KukaVariableDamping <SubjectNumber> <GroupNumber> <optional: TrialNumber>\n");
+		exit(1);
 	}
-	else if (argc ==2){
-		std::string metadataFile = argv[1];
-		useDefaultH5File = !(ParseSubjectMetadataFile(smds, metadataFile));
-	}
-	else{
-		/* Too much Info */
-		printf("Use: KukaVariableDamping <optional subject metadata file>\n");
-		return 0;
-	}
+	int subjectNumber 	= atoi(argv[1]);
+	int groupNumber 	= atoi(argv[2]);
 
-	/* Create or Open H5 File */
-	if (useDefaultH5File){
-		h5filename = "KukaData.h5";
+	/* Check Inputted Subject Number */
+	if (subjectNumber < 0){
+		printf("Subject Number Must Be Nonnegative\n");
+		printf("Inputted Subject Number: %d\n", subjectNumber);
+		exit(1);
 	}
 	else{
-		h5filename = smds.H5File;
+		printf("Subject: %d\n", subjectNumber);
 	}
-	fileH5 = CreateOrOpenFile(h5filename);
 
-	/* Create Subject Group */
-	if (useDefaultH5File){
-		time_t rawtime;
-		struct tm *timeinfo;
-		char namer[40];
-
-		time(&rawtime);
-		timeinfo = localtime(&rawtime);
-		strftime(namer, 40, "Data_%Y-%j-%H_%M_%S", timeinfo);//creates a file name that has year-julian day-hour min second (unique for each run, no chance of recording over previous data)
-
-		groupSubjectName = std::string(namer);
-		groupSubject = CreateOrOpenGroup(groupSubjectName);
+	/* Check Inputted Group Number */
+	if (groupNumber >= (int) groupDampingMode.size() || groupNumber < 0){
+		printf("Group Number Out of Acceptable Range\n");
+		printf("Inputted Group Number: %d\n", groupNumber);
+		printf("Min: 0\n");
+		printf("Max: %d\n", (int) groupDampingMode.size());
+		exit(1);
 	}
 	else{
-		groupSubjectName = "Subject" + std::to_string(smds.Number);
-		groupSubject = CreateOrOpenGroup(groupSubjectName);
-		/* Create subject attributes */
-		CreateNumericAttribute(groupSubject, "Number", smds.Number);
-		CreateStringAttribute(groupSubject, "Name", smds.Name);
-		CreateNumericAttribute(groupSubject, "Age", smds.Age);
-		CreateNumericAttribute(groupSubject, "Height", smds.Height);
-		CreateNumericAttribute(groupSubject, "Weight", smds.Weight);
-		CreateStringAttribute(groupSubject, "Gender", smds.Gender);
+		groupDamping = (DampingMode) groupDampingModes[groupNumber];
+		int trialDirSeqInd = groupDirectionSeq[groupNumber];
+		trialDirSeq << directionSequences.row(trialDirSeqInd);
+		printf("Group: %d\n", groupNumber);
 	}
 
-	/* Set up buffers to collect data */
-	int nPages = 2;
-	int nRows = 10000;
+	/* Parse the rest of the command line args */
+	int trialNumber;
+	std::string emgIpAddr;
+	const double DEFAULT_KP = 63.48;
+	const double DEFAULT_KN = 32.81;
+	double kp;
+	double kn;
 
-	int bufferFillCount = 0;
-	int activePage = 0;		// each buffer has 2 "pages" of 10000xn elements.  One page collects data, while the other is written to the hdf5 file. Whenever a write occurs, these pages switch
+	bool useEmg = false;
+	bool kpInputted = false;
+	bool knInputted = false;
+	bool trialNumberInputted = false;
 
-	int pflagCols = 1;
-	int	jointAngleCols = 7;
-	int forceCols = 6;
-	int poseCols = 6;
+	std::string argKey;
+	std::string argVal;
+	while (int iArg=3; iArg<argc-1; iArg++){
+		/* get key and val */
+		argKey = argv[i];
+		argVal = argv[i+1];
+		/* set key uppercase */
+		std::transform(argKey.begin(), argKey.end(), argKey.begin(), ::toupper);
 
-	int perturbFlagBuff[nPages][nRows][pflagCols];
-	double jointAngleBuff[nPages]nRows][jointAngleCols];
-	double forceBuff[nPages][nRows][forceCols];
-	double poseBuff[nPages][nRows][poseCols];
-
-	/* initialize datasets */
-
-	/* Perturb Flag */
-	int dsetCount = 0;
-	std::string dsetName = "PerturbFlag_Set" + std::to_string(dsetCount);
-	while (groupSubject->exists(dsetName)){
-		dsetCount++;
-		dsetName = "PerturbFlag_Set" + std::to_string(dsetCount);
+		if (argKey.compare("TN") == 0){
+			trialNumberInputted = true;
+			trialNumber = std::stoi(argVal);
+		}
+		else if (argKey.compare("EMG") == 0){
+			useEmg = true;
+			emgIpAddr = argVal;
+		}
+		else if (argKey.compare("KP") == 0){
+			kpInputted = true;
+			kp = std::stod(argVal);
+		}
+		else if (argKey.compare("KN") == 0){
+			knInputted = true;
+			kn = std::stod(argVal);
+		}
+		else{
+			printf("Key: %s not understood\n", argKey.c_str());
+		}
 	}
-	DataSet dsPerturbFlag = InitDataSet2D(groupSubject, dsetName, (hsize_t) pflagCols, PredType::NATIVE_INT);
 
-	/* Joint Angles */
-	int dsetCount = 0;
-	std::string dsetName = "JointAngle_Set" + std::to_string(dsetCount);
-	while (groupSubject->exists(dsetName)){
-		dsetCount++;
-		dsetName = "JointAngle_" + std::to_string(dsetCount);
+	/* Check kp and kn values */
+	if (groupNumber > 1){
+		if (!kpInputted || !kpInputted){
+			printf("Kp AND Kn must be inputted as command line options if group number > 1\n");
+			exit(1);
+		}
 	}
-	DataSet dsJointAngle = InitDataSet2D(groupSubject, dsetName, (hsize_t) jointAngleCols, PredType::NATIVE_DOUBLE);
-
-	/* Forces */
-	int dsetCount = 0;
-	std::string dsetName = "Force_Set" + std::to_string(dsetCount);
-	while (groupSubject->exists(dsetName)){
-		dsetCount++;
-		dsetName = "Force_Set" + std::to_string(dsetCount);
+	else{
+		if (!kpInputted){
+			kp = DEFAULT_KP;
+		}
+		if (!knInputted){
+			kn = DEFAULT_KN;
+		}
 	}
-	DataSet dsForce = InitDataSet2D(groupSubject, dsetName, (hsize_t) forceCols, PredType::NATIVE_DOUBLE);
 
-	/* Pose */
-	int dsetCount = 0;
-	std::string dsetName = "Pose_Set" + std::to_string(dsetCount);
-	while (groupSubject->exists(dsetName)){
-		dsetCount++;
-		dsetName = "Pose_Set" + std::to_string(dsetCount);
+	/* Check Inputted Trial Number */
+	if (trialNumber >= nTrialsPerGroup || trialNumber < 0){
+		printf("Trial Number Out of Acceptable Range\n");
+		printf("Inputted Trial Number: %d\n", trialNumber);
+		printf("Min: 0\n");
+		printf("Max: %d\n", nTrialsPerGroup -1);
+		exit(1);
 	}
-	DataSet dsPose = InitDataSet2D(groupSubject, dsetName, (hsize_t) poseCols, PredType::NATIVE_DOUBLE);
 
+	/* Check EMG use */
+	TrignoEmgClient emgClient();
+	if (useEmg){
+		emgClient.SetIpAddress(emgIpAddr);
+		int nEmgs = 4;
+		int emgList[nEmgs] = [1,2,3,4];
+		emgClient.SetEmgToSave(emgList, nEmgs);
+		emgClient.ConnectDataPort();
+		emgClient.ConnectCommPort();
+		if (emgClient.IsCommPortConnected()){
+			emgClient.SendCommand(1); // this command signals the emg server to send readings to Data Port
+			std::thread emgReceiveThread(&TrignoEmgClient::ReceiveDataStream, &emgClient);
+			emgReceiveThread.detach();
+		}
+	}
 
 	// UDP Server address and port hardcoded now -- change later
 	UDPServer udp_server(udp_addr_gui, udp_port_gui);
+
+	/* Paths for data files */
+	path p_base = current_path();
+	// subject directory
+	std::string subjectDir = "Subject" + std::to_string(subjectNumber);
+	path p_subject = p_base /= path(subjectDir);
+	create_directory(p_subject);
+	// group directory
+	std::string groupDir = "Group" + std::to_string(groupNumber);
+	path p_group = p_subject /= groupDir
+	create_directory(p_subject);
+
+	std::string trialDir;
+	path p_trial;
+	path p_kukadata;
+	path p_emgdata;
+	ofstream kukaDataFileStream;
+
+	/* HDF5 File */
+	H5File fileH5 = H5File();
+	std::string emgfilename = "EmgData.h5";
+
+	/* Kuka Data File */
+	std::string kukafilename = "KukaData.txt";
+
 
 	/* Force Related Varibles */
 	double ftx;						// Force x-direction (filtered)
@@ -170,14 +238,29 @@ int main(int argc, char** argv)
 	double fty_0 = 0.0;  			// Part of force filtering calc
 	double al = 0.5;				// exponential moving average alpha level
 
+	/* Variables related to variable dampings*/
+	float dt = 0.001;
+	double b_var;					// Variable damping
+	double b_LB = -20;				// Lower bound of damping
+	double b_UB = 10;				// Upper bound of damping
+	MatrixXd x_new_filt(6, 1); x_new_filt << 0, 0, 0, 0, 0, 0;
+	MatrixXd x_new_filt_old(6, 1); x_new_filt_old << 0, 0, 0, 0, 0, 0;
+	MatrixXd xdot_filt(6, 1); xdot_filt << 0, 0, 0, 0, 0, 0;
+	MatrixXd xdot_filt_old(6, 1); xdot_filt_old << 0, 0, 0, 0, 0, 0;
+	MatrixXd xdotdot_filt(6, 1); xdotdot_filt << 0, 0, 0, 0, 0, 0;
+	MatrixXd xdotdot_filt_old(6, 1); xdot_filt_old << 0, 0, 0, 0, 0, 0;
+
+	/* Variables related to filter of position, velocity and acceleration*/
+	double CUTOFF = 20.0;
+	double RC = (CUTOFF * 2 * 3.14);
+	double df = 1.0 / dt;
+	double alpha_filt = RC / (RC + df);
+
 	/* Shared Memory Setup */
 	std::string shmAddr("/home/justin/Desktop/FRI-Client-SDK_Cpp/example/PositionControl2/shmfile");
-	int shmnElements = 2;
-	int * data = InitSharedMemory<int>(shmAddr, shmnElements);
+	int shmNumElements = 3;
+	int * forceRaw = InitSharedMemory<int>(shmAddr, shmNumElements);
 
-	/* Force baseline variables/flags */
-	int firstIt = 0;			// first iteration flag
-	int steady = 0;				// Flag to collect average first 2000 samples of forces without moving KUKA
 
 	/* Euler Angles */
 	double phi_euler = 0;
@@ -192,10 +275,9 @@ int main(int argc, char** argv)
 	MatrixXd theta(1, 7); theta << 0, 0, 0, 0, 0, 0, 0;
 
 
-
 	MatrixXd qc(6, 1); qc << 0, 0, 0, 0, 0, 0;					// calculated joint space parameter differences (between current and prev iteration)
 	MatrixXd delta_q(6, 1); delta_q << 0, 0, 0, 0, 0, 0;		// (current - initial) joint space parameters
-	MatrixXd q_init(6, 1); q_init << 0, 0, 0, 0, 0, 0;			// initial joint space parameter (after steady parameter is met)
+	MatrixXd q_init(6, 1); q_init << 0, 0, 0, 0, 0, 0;			// initial joint space parameter
 
 	MatrixXd x_e(6, 1); x_e << 0, 0, 0, 0, 0, 0;				// end effector equilibrium position
 	MatrixXd force(6, 1); force << 0, 0, 0, 0, 0, 0;			// force vector (filtered)
@@ -207,13 +289,40 @@ int main(int argc, char** argv)
 	MatrixXd x_old(6, 1); x_old << 0, 0, 0, 0, 0, 0;			// one iteration old position and pose
 	MatrixXd x_oldold(6, 1); x_oldold << 0, 0, 0, 0, 0, 0;		// two iteration old position and pose
 
-	double xy_coord[2];											// xy coordinates that are send to gui
+
+	/* GUI variables*/
+	double gui_data[16];											// xy coordinates that are send to gui
+	memset(gui_data, 0, sizeof(double) * 16);
+
+	double radius_e = 0.005;
+	double rangex_ = -0.18;
+	double rangex = 0.18;
+	double rangey_ = 0.58;
+	double rangey = 0.94;
+	double d_r = 0;
+	double ex_r = (rangex * 2) / 25;
+	double u_r = ex_r - radius_e;;
 
 
-	// parse command line arguments
-	const char* hostname = (argc >= 3) ? argv[2] : DEFAULT_IP; //optional command line argument for ip address (default is for KONI)
-	int port = (argc >= 4) ? atoi(argv[3]) : DEFAULT_PORTID; //optional comand line argument for port
+	/* Variables related to defining target*/
+	int guiMode = 2;
+	TargetPosition targetPos = TargetPosition::NEUTRAL;
+	MatrixXd neutralXY(2, 1); neutralXY << 0, 0.76;
+	MatrixXd endEffectorXY(2, 1); endEffectorXY << 0, 0;
+	MatrixXd targetXY(2, 1); targetXY << 0, 0;
+	bool withinErrorBound;
 
+	/* Variables related to defining new trial*/
+	int trialSettleIterCount = 0;
+	const int trialEndIterCount = 2000;
+	bool trialRunning = false;
+	bool targetReached = false;
+	int trialWaitCounter = 0;
+	int trialWaitTime = rand() % 1000 + 500;
+
+	/* Koni Connection */
+	const char* hostname = DEFAULT_IP; //optional command line argument for ip address (default is for KONI)
+	int port = DEFAULT_PORTID; //optional comand line argument for port
 
 	int count = 0;					// iteration counter
 	float sampletime = 0.001;
@@ -221,8 +330,8 @@ int main(int argc, char** argv)
 
 	double MaxRadPerSec[7] = { 1.7104,1.7104,1.7453,2.2689,2.4435,3.14159,3.14159 }; //absolute max velocity (no load from KUKA manual for iiwa 800)																					 //double MaxRadPerSec[7]={1.0,1.0,1.0,1.0,1.0,1.0,1.0}; //more conservative velocity limit
 	double MaxRadPerStep[7] = { 0 };	// will be calculated
-	double MaxJointLimitRad[7] = { 2.9671,2.0944,2.9671,2.0944,2.9671,2.0944,3.0543 };//Max joint limits in radians (can be changed to further restrict motion of robot)
-	double MinJointLimitRad[7] = { -2.9671,-2.0944,-2.9671,-2.0944,-2.9671,-2.0944,-3.0543 }; //Min joint limits in radians (can be changed to further restrict motion of robot)
+	double MaxJointLimitRad[7] = { 2.9671,2.0944,2.9671,2.0944,2.9671,2.0944,3.0543 };			//Max joint limits in radians (can be changed to further restrict motion of robot)
+	double MinJointLimitRad[7] = { -2.9671,-2.0944,-2.9671,-2.0944,-2.9671,-2.0944,-3.0543 }; 	//Min joint limits in radians (can be changed to further restrict motion of robot)
 
 
 	//calculate max step value
@@ -256,8 +365,9 @@ int main(int argc, char** argv)
 	memcpy(client.LastJoint, client.NextJoint, 7 * sizeof(double));
 
 
+	bool enough = false;
 
-	while (true)
+	while (!enough)
 	{
 
 		app.step();//step through program
@@ -265,16 +375,7 @@ int main(int argc, char** argv)
 		if (client.KukaState == 4)
 		{
 			count++; //count initialized at 0
-			if (count == 1)//first time inside
-			{
-				sampletime = client.GetTimeStep();
-				//calculate max step value
-				for (int i = 0; i < 7; i++)
-				{
-					client.MaxRadPerStep[i] = sampletime*MaxRadPerSec[i]; //converts angular velocity to discrete time step
-				}
 
-			}
 
 			// Update measured joint angle values
 			memcpy(MJoint, client.GetMeasJoint(), sizeof(double) * 7);
@@ -394,165 +495,242 @@ int main(int argc, char** argv)
 											   0, 0, 0, 0, 0, 0.0001;
 
 
-			if (firstIt == 0)	//first time inside
-			{
-				firstIt = 1;
-				// Initialize equilibrium position and pose
-				x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
-				x_old << x_e;
-				x_oldold << x_e;
-				x_new << x_e;
-			}
-
-			// Get force data from shared memory, convert to Newtons
-			ftx = (double)data[0] / 1000000 - zerox; //toward varun desk
-			ftx_un = (double)data[0] / 1000000 - zerox;
-
-			fty = (double)data[1] / 1000000 - zeroy;
-			fty_un = (double)data[1] / 1000000 - zeroy;
-
-			// Filter force data with exponential moving average
-			ftx = al*ftx + (1 - al)*ftx_0;
-			ftx_0 = ftx;
-			fty = al*fty + (1 - al)*fty_0;
-			fty_0 = fty;
-
-			force << ftx,0,fty,0,0,0;
-
 
 			/* For first 2 seconds, apply exponential moving average to force
 			measurements, this will be the bias value */
-			steady = steady + 1;
-			if (steady < 2000)
-			{
-			    force << 0, 0, 0, 0, 0, 0;
+			if (count < 2000){
+				if (count == 1){	//first time inside
+					sampletime = client.GetTimeStep();
+					//calculate max step value
+					for (int i = 0; i < 7; i++)
+					{
+						client.MaxRadPerStep[i] = sampletime*MaxRadPerSec[i]; //converts angular velocity to discrete time step
+					}
 
-			    zerox = al*(double)data[0] / 1000000 + (1 - al)*zerox;
-			    zeroy = al*(double)data[1] / 1000000 + (1 - al)*zeroy;
-
-			    q_new(0) = -1.5708;
-			    q_new(1) = 1.5708;
-			    q_new(2) = 0;
-			    q_new(3) = 1.5708;
-			    q_new(4) = 0;
-			    q_new(5) = -1.5708;
-			    q_init << q_new;
-			 }
-
-			 /* Will be replaced by HDF5 File stuff
-			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %lf %lf %lf %lf %lf %lf\n",
-								count,
-								MJoint[0],
-								MJoint[1],
-								MJoint[2],
-								MJoint[3],
-								MJoint[4],
-								MJoint[5],
-								MJoint[6],
-								force(0),
-								force(2),
-								x_new(0),
-								x_new(1),
-								x_new(2),
-								x_new(3),
-								x_new(4),
-								x_new(5));
-			*/
-			/* Fill data buffers and write if necessary */
-			memcpy(&(perturbFlagBuff[activePage][bufferFillCount][0]), &count, sizeof(int)*pflagCols);
-			memcpy(&(JointAngleBuff[activePage][bufferFillCount][0]), MJoint, sizeof(double)*jointAngleCols);
-			memcpy(&(forceBuff[activePage][bufferFillCount][0]), force.data(), sizeof(double)*forceCols);
-			memcpy(&(poseBuff[activePage][bufferFillCount][0]), x_new.data(), sizeof(double)*poseCols);
-
-			bufferFillCount++;
-			if (bufferFillCount == nRows){
-				/* Write perturb flag */
-				std::thread t1(AppendToDataSet2D,
-							   std::ref(dsPerturbFlag),
-							   &(perturbFlagBuff[activePage][0][0]),
-							   bufferFillCount,
-							   pflagCols,
-							   PredType::NATIVE_INT);
-				t1.detach();
-
-				/* Write Joint Angle */
-				std::thread t2(AppendToDataSet2D,
-							   std::ref(dsJointAngle),
-							   &(jointAngleBuff[activePage][0][0]),
-							   bufferFillCount,
-							   jointAngleCols,
-							   PredType::NATIVE_DOUBLE);
-				t2.detach();
-
-				/* Write Forces */
-				std::thread t3(AppendToDataSet2D,
-							   std::ref(dsForce),
-							   &(forceBuff[activePage][0][0]),
-							   bufferFillCount,
-							   forceCols,
-							   PredType::NATIVE_DOUBLE);
-				t3.detach();
-
-				/* Write Pose */
-				std::thread t4(AppendToDataSet2D,
-							   std::ref(dsPose),
-							   &(poseBuff[activePage][0][0]),
-							   bufferFillCount,
-							   poseCols,
-							   PredType::NATIVE_DOUBLE);
-				t4.detach();
-
-				/* Reset counters */
-				bufferFillCount = 0;
-				if (activePage == 0){
-					activePage = 1;
+					// Initialize equilibrium position and pose
+					x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
+					x_old << x_e;
+					x_oldold << x_e;
+					x_new << x_e;
 				}
-				else if (activePage == 1){
-					activePage = 0;
-				}
+				/* zero force vector, so the end effector pos does not change */
+				force << 0, 0, 0, 0, 0, 0;
+
+				/* average force readings to get a zero level */
+				zerox = al*(double)forceRaw[0] / 1000000 + (1 - al)*zerox;
+				zeroy = al*(double)forceRaw[1] / 1000000 + (1 - al)*zeroy;
+
+				/* set joint positions to the default */
+				q_new(0) = -1.5708;
+				q_new(1) = 1.5708;
+				q_new(2) = 0;
+				q_new(3) = 1.5708;
+				q_new(4) = 0;
+				q_new(5) = -1.5708;
+				q_init << q_new;
 			}
+			else{  // after 2 seconds
 
+				 /* Set target placement */
+	 			if (targetPos == TargetPosition::LEFT)
+	 			{
+	 				targetXY(0) = neutralXY(0) + 0.06;
+	 				targetXY(1) = neutralXY(1);
+	 			}
+	 			else if (targetPos == TargetPosition::RIGHT)
+	 			{
+	 				targetXY(0) = neutralXY(0) - 0.06;
+	 				targetXY(1) = neutralXY(1);
+	 			}
+	 			else if (targetPos == TargetPosition::NEUTRAL)
+	 			{
+	 				targetXY(0) = neutralXY(0);
+	 				targetXY(1) = neutralXY(1);
+	 			}
 
+				/* Move through trial specifics */
+				withinErrorBound = (pow((endEffectorXY(0) - targetXY(0)),2) + pow((endEffectorXY(1) - targetXY(1)),2) <= pow(radius_e,2));
+				if (trialRunning){		// trial running
+					/* Write To Kuka Data File */
+					kukaDataFileStream 	<< MJoint[0] << ","
+										<< MJoint[1] << ","
+										<< MJoint[2] << ","
+										<< MJoint[4] << ","
+										<< MJoint[5] << ","
+										<< MJoint[6] << ","
+										<< force(0)  << ","
+										<< force(2)  << ","
+										<< x_new(0)  << ","
+										<< x_new(0)  << ","
+										<< x_new(1)  << ","
+										<< x_new(2)  << ","
+										<< x_new(3)  << ","
+										<< x_new(4)  << ","
+										<< x_new(4)  << ","
+										<< (int) targetPos  << ","
+										<< damping(0,0)  << std::endl;
 
-			// Shift old position/pose vectors, calculate new
-			x_oldold << x_old;
-			x_old << x_new;
-			x_new << (inertia/(0.000001) + damping/(0.001) + stiffness).inverse()*(force + (inertia/(0.000001))*(x_old - x_oldold) + stiffness*(x_e - x_old)) + x_old;
+					/*
+					 * Trials are designed as the following.  Before the trial, a target
+					 * is position is set, the trial is then started.  The subject must
+					 * travel to the target position, within it's error bounds. As soon as
+					 * the target is reached, the trial will last for only the next two seconds.
+					 * Once those two seconds are up, the trial is ended.
+					 */
 
-			// Implement virtual wall
-			if (steady > 2000)
-			{
-			    if (x_new(2) >= 0.94)
-			    {
+					/* Triggered when trial is running and target is first reached */
+					if (!targetReached && withinErrorBound){
+		 				targetReached = true;
+						trialSettleIterCount = 0;
+		 			}
+
+					/* Keep iteration count after target is first reached */
+					if (targetReached){
+						trialSettleIterCount++;
+
+						/* End Trial --- This occurs 2 secs after the target was reached */
+						if (trialSettleIterCount >= trialEndIterCount){
+							targetReached = false;
+							trialRunning = false;
+							targetPos = TargetPosition::NEUTRAL;
+
+							/* Stop emg recording if necessary */
+							if (useEmg){
+								emgClient.StopWriting();
+							}
+
+						}
+					}
+
+				}
+				else{					// trial not running
+					/*
+					 * Time between trial flows in the following manner. The subject
+					 * must move within the neutral position error bounds.  Once this occurs,
+					 * a random amount of time, between 0.5-1.5 seconds passes, then the trial
+					 * will start.
+					 */
+
+					 /* Triggered when trial is not running and target (neutral position) is first reached */
+					 if (!targetReached && withinErrorBound){
+						 targetReached = true;
+						 trialWaitCounter = 0;
+						 trialWaitTime = rand() % 1000 + 500;
+					 }
+
+					 /* Keep iteration count after target is first reached */
+					 if (targetReached){
+						 trialWaitCounter++;
+
+						 /* Start Trial --- This occurs 0.5-1.5 seconds after the neutral position is first reached */
+						 if (trialWaitCounter >= trialWaitTime){
+							 if (trialNumber < nTrialsPerGroup){
+								targetReached = false;
+								trialRunning = true;
+							 	targetPos = (TargetPosition) (trialDirSeq(trialNumber) + 1);
+
+								/* Make trial directory */
+								trialDir = std::string("Trial") + std::to_string(trialNumber);
+								p_trial = p_subject /= path(trialDir);
+								create_directory(p_trial);
+
+								/* Create kuka data trial files */
+								p_kukadata = p_trial /= Path(kukafilename);
+								kukaDataFileStream = CreateKukaDataFile(p_kukadata);
+
+								/* Create emg hdf5 file */
+								if (useEmg){
+									p_emgdata = p_trial /= path(emgfilename);
+									h5file = CreateOrOpenH5File(p_emgdata.string());
+									emgClient.StartWriting(&h5file);
+								}
+							}
+							 else{
+								 enough = true;		// ends group of trials
+							 }
+							 trialNumber++;
+						 }
+					 }
+				 }
+
+				 // Get force data from shared memory, convert to Newtons
+ 				ftx 	= (double)forceRaw[0] / 1000000 - zerox; //toward varun desk
+ 				ftx_un 	= (double)forceRaw[0] / 1000000 - zerox;
+
+ 				fty 	= (double)forceRaw[1] / 1000000 - zeroy;
+ 				fty_un 	= (double)forceRaw[1] / 1000000 - zeroy;
+
+ 				// Filter force data with exponential moving average
+ 				ftx = al*ftx + (1 - al)*ftx_0;
+ 				ftx_0 = ftx;
+ 				fty = al*fty + (1 - al)*fty_0;
+ 				fty_0 = fty;
+
+ 				/* Copy filtered force data into force matrix */
+ 				force << ftx,0,fty,0,0,0;
+
+				/* Calculate damping */
+				if (groupDamping == DampingMode::POSITIVE){
+					damping(0,0) = b_UB;
+				}
+				else if (groupDamping == DampingMode::NEGATIVE){
+					damping(0,0) = b_LB;
+				}
+				else if (groupDamping == DampingMode::VARIABLE){
+					damping(0,0) = b_var;
+				}
+				else if (groupDamping == DampingMode::ZERO){
+					damping(0,0) = 0;
+				}
+
+				// Shift old position/pose vectors, calculate new position
+				x_oldold << x_old;
+				x_old << x_new;
+				x_new << (inertia/(0.000001) + damping/(0.001) + stiffness).inverse()*(force + (inertia/(0.000001))*(x_old - x_oldold) + stiffness*(x_e - x_old)) + x_old;
+
+				// Implement virtual wall - enforces boundaries on new position
+			    if (x_new(2) >= 0.94){
 			      x_new(2) = 0.94;
 			    }
 
-			    if (x_new(2) <= 0.58)
-			    {
+			    if (x_new(2) <= 0.58){
 			      x_new(2) = 0.58;
 			    }
 
-			    if (x_new(0) >= 0.18)
-			    {
+			    if (x_new(0) >= 0.18){
 			      x_new(0) = 0.18;
 			    }
 
-			    if (x_new(0) <= -0.18)
-			    {
+			    if (x_new(0) <= -0.18){
 			      x_new(0) = -0.18;
 			    }
-			}
 
-			/* Calculate new joint velocities/angles */
-			if (0.58 <= x_new(2) & x_new(2) <= 0.94)
-			{
-			    if (-0.18 <= x_new(0) & x_new(0) <= 0.18)
-			    {
-			      qc << Ja.inverse()*(x_new - x_old);
-			      delta_q << delta_q +qc;
-			      q_new << delta_q +q_init;
-			    }
-			}
+				/* Calculate new joint velocities/angles */
+				qc << Ja.inverse()*(x_new - x_old);
+				delta_q << delta_q +qc;
+				q_new << delta_q +q_init;
+
+				/* Filter */
+				x_new_filt_old 		= x_new_filt;
+				x_new_filt 			= x_new_filt_old + (alpha_filt*(x_new - x_new_filt_old));
+
+				xdot_filt_old 		= xdot_filt;
+				xdot 				= (x_new_filt - x_new_filt_old) / dt;
+				xdot_filt 			= xdot_filt_old + (alpha_filt*(xdot - xdot_filt_old));
+
+				xdotdot_filt_old 	= xdotdot_filt;
+				xdotdot 			= (xdot_filt - xdot_filt_old) / dt;
+				xdotdot_filt 		= xdotdot_filt_old + (alpha_filt*(xdotdot - xdotdot_filt_old));
+
+				// calculating variable damping
+				if (xdot_filt(0)*xdotdot_filt(0) >= 0)					{
+					b_var = (2 * b_LB / (1 + exp(-kp * xdot_filt(0)*xdotdot_filt(0))) - b_LB);
+				}
+				else					{
+					b_var = -(2 * b_UB / (1 + exp(-kn * xdot_filt(0)*xdotdot_filt(0))) - b_UB);
+				}
+
+			} // end if (count > 2000)
 
 			// Register new joint angles with KUKA
 			client.NextJoint[0] = q_new(0);
@@ -564,20 +742,59 @@ int main(int argc, char** argv)
 			client.NextJoint[6] = -0.958709;
 
 			// Send data to visualizer gui
-			xy_coord[0] = T06(0,3);
-			xy_coord[1] = T06(2,3);
-			udp_server.Send(xy_coord, 2);
+			gui_data[0] = guiMode;
+			gui_data[1] = neutralXY(0);
+			gui_data[2] = neutralXY(1);
+			gui_data[3] = d_r;
+			gui_data[4] = endEffectorXY(0);
+			gui_data[5] = endEffectorXY(1);
+			gui_data[6] = u_r;
+			gui_data[7] = targetXY(0);
+			gui_data[8] = targetXY(1);
+			gui_data[9] = ex_r;
+			gui_data[10] = damping(0, 0);
+			udp_server.Send(gui_data, 16);
 		}
 	}
 
-	// Dead code but useful (maybe in future)
-	usleep(10000000);//microseconds //wait for close on other side
-
 	// disconnect from controller
 	app.disconnect();
+	sleep(0.5);
+	if (useEmg){
+		client.StopReceiveDataStream();
+	}
+	sleep(0.5);
+
+	printf("Group %d trials finished\n", groupNumber);
 
 	return 1;
 }
+
+
+ofstream CreateKukaDataFile(path kukaDataFilePath){
+	/* deconstruct kuka file path into path, filename, extension */
+	path pp = kukaDataFilePath.parent_path();
+	path fname_stem = kukaDataFilePath.stem();
+	path fname_ext = kukaDataFilePath.extension();
+
+	/* Make a path to rename old file with same path, and rename if necessary */
+	path p_unsuc = path(kukaDataFilePath.string());
+	int unsuc_count = 1;
+	std::string fname_unsuc;
+	if (is_regular_file(p_unsuc)){
+		while (is_regular_file(p_unsuc)){
+			fname_unsuc = fname_stem.string() + std::string("_unsuccessful_") + std::to_string(unsuc_count) + fname_ext.string();
+			p_unsuc = path(pp.string()) /= path(fname_unsuc);
+			unsuc_count++;
+		}
+		rename(kukaDataFilePath, p_unsuc);
+	}
+
+	/* Make file stream */
+	ofstream ofs(kukaDataFilePath);
+	return ofs;
+}
+
 
 // Shared Memory-------------------------------------------------------
 template<typename T>

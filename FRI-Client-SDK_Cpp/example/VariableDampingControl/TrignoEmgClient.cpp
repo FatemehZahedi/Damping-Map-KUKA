@@ -23,7 +23,27 @@ TrignoEmgClient::TrignoEmgClient(std::string ipAddr){
 	/* Initialize communicaion port commands */
 	_cmds[1] = "START\r\n\r\n";
 	_cmds[2] = "STOP\r\n\r\n";
+}
 
+/* Public Functions */
+TrignoEmgClient::TrignoEmgClient(){
+	/* Initialize communicaion port commands */
+	_cmds[1] = "START\r\n\r\n";
+	_cmds[2] = "STOP\r\n\r\n";
+}
+
+void TrignoEmgClient::SetIpAddress(std::string ipAddr){
+    /* Set IP address */
+    _ipAddr = ipAddr;
+
+    /* Create IP address */
+    _addr = boost::asio::ip::make_address(_ipAddr);
+
+    /* Set Endpoint Address and Port*/
+    _endpointComm.address(_addr);
+    _endpointData.address(_addr);
+    _endpointComm.port(_portComm);
+    _endpointData.port(_portData);
 }
 
 TrignoEmgClient::~TrignoEmgClient(){
@@ -263,17 +283,18 @@ void TrignoEmgClient::StartWriting(H5Location * h5loc){
      dsPropList.setChunk(rank, chunkDims);       // Allows dataset to be chunked
 
     /* Create EMG dataset */
-    std::string datasetNameBase = "EMG_";
-    int datasetNum = 0;
-    std::string datasetName = datasetNameBase + std::to_string(datasetNum);
-    bool locationExist = h5loc->exists(datasetName);
-    while (locationExist){
-        printf("Dataset %s exists.\n", datasetName.c_str());
-        datasetNum++;
-        datasetName = datasetNameBase + std::to_string(datasetNum);
-        locationExist = h5loc->exists(datasetName);
+    std::string datasetNameBase = "EMG";
+    int datasetNum = 1;
+    std::string datasetName = datasetNameBase;
+    std::string datasetNameUnsuc = datasetName;
+    if (h5loc->exists(datasetNameUnsuc)){
+        while (h5loc->exists(datasetNameUnsuc)){
+            datasetNameUnsuc = datasetNameBase + std::string("_unsuccessful_") + std::to_string(datasetNum);
+            datasetNum++;
+        }
+        /* renames old EMG dataset as EMG_unsuccessful_# */
+        h5loc->move(datasetName, datasetNameUnsuc);
     }
-    printf("Creating Dataset: %s\n", datasetName);
     datasetEmg = h5loc->createDataSet(datasetName,
                                       PredType::NATIVE_FLOAT,
                                       fspace,
@@ -292,7 +313,8 @@ void TrignoEmgClient::StopWriting(){
      * that haven't yet been written and stop the writing process.
      */
     _writeFlag = false;
-    WriteH5Chunk();
+    std::thread t(&TrignoEmgClient::WriteH5Chunk, this);
+    t.detach();
 }
 
 void TrignoEmgClient::WriteH5Chunk(){

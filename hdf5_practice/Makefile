@@ -5,10 +5,10 @@ EXTLIB		= -L$(HDF_INSTALL)/lib 			# Tanner's Laptop
 # HDFLIB      = $(HDF_INSTALL)/lib64		# KUKA Computer
 HDFLIB		= $(HDF_INSTALL)/lib			# Tanner's Laptop
 CC          = g++
-CFLAGS      =
+CFLAGS      = -std=c++11 -pthread
 LIB         = -lz -lm -ldl #-lsz
 
-TARGET = h5_twobuffer
+TARGET = practice
 
 INCLUDE   = -I$(HDF_INSTALL)/include
 LIBSHDF   = $(EXTLIB) -lhdf5_cpp \

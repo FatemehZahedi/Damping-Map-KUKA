@@ -81,8 +81,10 @@ private:
 
 public:
 	/* PUBLIC FUNCTIONS */
+    TrignoEmgClient();                              // Constructor
     TrignoEmgClient(std::string ipAddr);            // Constructor
     ~TrignoEmgClient();                             // Destructor
+    void SetIpAddress(std::string ipAddr);
     void SetEmgToSave(int emgList[], int nEmgs);
     /* Connect Ports */
     void ConnectDataPort();
