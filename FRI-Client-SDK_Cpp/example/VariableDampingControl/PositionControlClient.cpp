@@ -27,10 +27,10 @@ void PositionControlClient::InitValues(double MRPStep[7], double MaxJLRad[7], do
     memcpy(MinJointLimitRad,MinJLRad,7*sizeof(double));
 
 
-    fprintf(stdout,"Position Control Client initialized:\n");
-    fprintf(stdout,"MaxRadPerStep:%lf %lf %lf %lf %lf %lf %lf\n",MaxRadPerStep[0],MaxRadPerStep[1],MaxRadPerStep[2],MaxRadPerStep[3],MaxRadPerStep[4],MaxRadPerStep[5],MaxRadPerStep[6]);
-    fprintf(stdout,"MaxJointLimitRad:%lf %lf %lf %lf %lf %lf %lf\n",MaxJointLimitRad[0],MaxJointLimitRad[1],MaxJointLimitRad[2],MaxJointLimitRad[3],MaxJointLimitRad[4],MaxJointLimitRad[5],MaxJointLimitRad[6]);
-    fprintf(stdout,"MinJointLimitRad:%lf %lf %lf %lf %lf %lf %lf\n",MinJointLimitRad[0],MinJointLimitRad[1],MinJointLimitRad[2],MinJointLimitRad[3],MinJointLimitRad[4],MinJointLimitRad[5],MinJointLimitRad[6]);
+    // fprintf(stdout,"Position Control Client initialized:\n");
+    // fprintf(stdout,"MaxRadPerStep:%lf %lf %lf %lf %lf %lf %lf\n",MaxRadPerStep[0],MaxRadPerStep[1],MaxRadPerStep[2],MaxRadPerStep[3],MaxRadPerStep[4],MaxRadPerStep[5],MaxRadPerStep[6]);
+    // fprintf(stdout,"MaxJointLimitRad:%lf %lf %lf %lf %lf %lf %lf\n",MaxJointLimitRad[0],MaxJointLimitRad[1],MaxJointLimitRad[2],MaxJointLimitRad[3],MaxJointLimitRad[4],MaxJointLimitRad[5],MaxJointLimitRad[6]);
+    // fprintf(stdout,"MinJointLimitRad:%lf %lf %lf %lf %lf %lf %lf\n",MinJointLimitRad[0],MinJointLimitRad[1],MinJointLimitRad[2],MinJointLimitRad[3],MinJointLimitRad[4],MinJointLimitRad[5],MinJointLimitRad[6]);
 
 
 }

@@ -40,7 +40,7 @@ using namespace H5;
 
 
 /* GUI UDP Server Address/Port */
-const std::string 	udp_addr_gui("192.168.0.103");
+const std::string 	udp_addr_gui("192.168.0.100");
 const int 			udp_port_gui = 50000;
 
 
@@ -176,6 +176,9 @@ int main(int argc, char** argv)
 	}
 
 	/* Check Inputted Trial Number */
+	if (!trialNumberInputted){
+		trialNumber = (int) DEFAULT_TRIALNUMBER;
+	}
 	if (trialNumber >= nTrialsPerGroup || trialNumber < 0){
 		printf("Trial Number Out of Acceptable Range\n");
 		printf("Inputted Trial Number: %d\n", trialNumber);
@@ -207,12 +210,12 @@ int main(int argc, char** argv)
 	path p_base = current_path();
 	// subject directory
 	std::string subjectDir = "Subject" + std::to_string(subjectNumber);
-	path p_subject = p_base /= path(subjectDir);
+	path p_subject = path(p_base.string()) /= path(subjectDir);
 	create_directory(p_subject);
 	// group directory
 	std::string groupDir = "Group" + std::to_string(groupNumber);
-	path p_group = p_subject /= path(groupDir);
-	create_directory(p_subject);
+	path p_group = path(p_subject.string()) /= path(groupDir);
+	create_directory(p_group);
 
 	std::string trialDir;
 	path p_trial;
@@ -307,7 +310,7 @@ int main(int argc, char** argv)
 
 	/* Variables related to defining target*/
 	int guiMode = 2;
-	TargetPosition targetPos = TargetPosition::NEUTRAL;
+	TargetPosition targetPos = TargetPosition::LEFT;
 	MatrixXd neutralXY(2, 1); neutralXY << 0, 0.76;
 	MatrixXd endEffectorXY(2, 1); endEffectorXY << 0, 0;
 	MatrixXd targetXY(2, 1); targetXY << 0, 0;
@@ -320,6 +323,7 @@ int main(int argc, char** argv)
 	bool targetReached = false;
 	int trialWaitCounter = 0;
 	int trialWaitTime = rand() % 1000 + 500;
+	bool readyForTrials = false;
 
 	/* Koni Connection */
 	const char* hostname = DEFAULT_IP; //optional command line argument for ip address (default is for KONI)
@@ -353,6 +357,12 @@ int main(int argc, char** argv)
 
 	// connect client application to KUKA Sunrise controller
 	app.connect(port, hostname);
+
+	// Initialize stiffness, damping, and inertia matrices
+	MatrixXd inertia(6, 6);
+	MatrixXd stiffness(6, 6);
+	MatrixXd damping(6, 6); 
+
 
 
 	// Initial Joint Angles
@@ -473,29 +483,9 @@ int main(int argc, char** argv)
 
 			MatrixXd Ja(6, 6); Ja << Tphi.inverse()*Jg;			// Analytical Jacobian
 
-			// Initializing Stiffness Damping and Inertia
-			MatrixXd stiffness(6, 6); stiffness << 0, 0, 0, 0, 0, 0, //toward varun desk
-												   0, 10000000, 0, 0, 0, 0, //up
-												   0, 0, 0, 0, 0, 0, //out toward workshop
-												   0, 0, 0, 1000000, 0, 0,
-												   0, 0, 0, 0, 1000000, 0,
-												   0, 0, 0, 0, 0, 1000000;
-
-			MatrixXd damping(6, 6); damping << 30, 0, 0, 0, 0, 0,
-												0, 100, 0, 0, 0, 0,
-												0, 0, 30, 0, 0, 0,
-												0, 0, 0, 0.5, 0, 0,
-												0, 0, 0, 0, 0.5, 0,
-												0, 0, 0, 0, 0, 0.5;
-
-			MatrixXd inertia(6, 6); inertia << 7, 0, 0, 0, 0, 0,
-											   0, 0.000001, 0, 0, 0, 0,
-											   0, 0, 10, 0, 0, 0,
-											   0, 0, 0, 0.0001, 0, 0,
-											   0, 0, 0, 0, 0.0001, 0,
-											   0, 0, 0, 0, 0, 0.0001;
-
-
+			/* Set end effector position */
+			endEffectorXY(0) = T06(0,3);
+			endEffectorXY(1) = T06(2,3);
 
 			/* For first 2 seconds, apply exponential moving average to force
 			measurements, this will be the bias value */
@@ -513,6 +503,28 @@ int main(int argc, char** argv)
 					x_old << x_e;
 					x_oldold << x_e;
 					x_new << x_e;
+
+					// Initializing Stiffness Damping and Inertia
+					stiffness << 0, 0, 0, 0, 0, 0, //toward varun desk
+											 0, 10000000, 0, 0, 0, 0, //up
+											 0, 0, 0, 0, 0, 0, //out toward workshop
+											 0, 0, 0, 1000000, 0, 0,
+											 0, 0, 0, 0, 1000000, 0,
+											 0, 0, 0, 0, 0, 1000000;
+
+					damping << 30, 0, 0, 0, 0, 0,
+											0, 100, 0, 0, 0, 0,
+											0, 0, 30, 0, 0, 0,
+											0, 0, 0, 0.5, 0, 0,
+											0, 0, 0, 0, 0.5, 0,
+											0, 0, 0, 0, 0, 0.5;
+
+					inertia << 7, 0, 0, 0, 0, 0,
+										 0, 0.000001, 0, 0, 0, 0,
+										 0, 0, 10, 0, 0, 0,
+										 0, 0, 0, 0.0001, 0, 0,
+										 0, 0, 0, 0, 0.0001, 0,
+										 0, 0, 0, 0, 0, 0.0001;
 				}
 				/* zero force vector, so the end effector pos does not change */
 				force << 0, 0, 0, 0, 0, 0;
@@ -549,109 +561,121 @@ int main(int argc, char** argv)
 	 				targetXY(1) = neutralXY(1);
 	 			}
 
-				/* Move through trial specifics */
 				withinErrorBound = (pow((endEffectorXY(0) - targetXY(0)),2) + pow((endEffectorXY(1) - targetXY(1)),2) <= pow(radius_e,2));
-				if (trialRunning){		// trial running
-					/* Write To Kuka Data File */
-					kukaDataFileStream 	<< MJoint[0] << ","
-										<< MJoint[1] << ","
-										<< MJoint[2] << ","
-										<< MJoint[4] << ","
-										<< MJoint[5] << ","
-										<< MJoint[6] << ","
-										<< force(0)  << ","
-										<< force(2)  << ","
-										<< x_new(0)  << ","
-										<< x_new(0)  << ","
-										<< x_new(1)  << ","
-										<< x_new(2)  << ","
-										<< x_new(3)  << ","
-										<< x_new(4)  << ","
-										<< x_new(4)  << ","
-										<< (int) targetPos  << ","
-										<< damping(0,0)  << std::endl;
-
-					/*
-					 * Trials are designed as the following.  Before the trial, a target
-					 * is position is set, the trial is then started.  The subject must
-					 * travel to the target position, within it's error bounds. As soon as
-					 * the target is reached, the trial will last for only the next two seconds.
-					 * Once those two seconds are up, the trial is ended.
-					 */
-
-					/* Triggered when trial is running and target is first reached */
-					if (!targetReached && withinErrorBound){
-		 				targetReached = true;
-						trialSettleIterCount = 0;
-		 			}
-
-					/* Keep iteration count after target is first reached */
-					if (targetReached){
-						trialSettleIterCount++;
-
-						/* End Trial --- This occurs 2 secs after the target was reached */
-						if (trialSettleIterCount >= trialEndIterCount){
-							targetReached = false;
-							trialRunning = false;
-							targetPos = TargetPosition::NEUTRAL;
-
-							/* Stop emg recording if necessary */
-							if (useEmg){
-								emgClient.StopWriting();
-							}
-
-						}
+				/*
+				 * Move to left position before trials start. Match left position, then move to neutral.
+				 * At this point we are ready for trials.
+				 */
+				if (!readyForTrials){
+					if (withinErrorBound){
+						readyForTrials = true;
+						targetPos = TargetPosition::NEUTRAL;
 					}
-
 				}
-				else{					// trial not running
-					/*
-					 * Time between trial flows in the following manner. The subject
-					 * must move within the neutral position error bounds.  Once this occurs,
-					 * a random amount of time, between 0.5-1.5 seconds passes, then the trial
-					 * will start.
-					 */
+				else{ // ready for trials
+					/* Move through trial specifics */
+					if (trialRunning){		// trial running
+						/* Write To Kuka Data File */
+						kukaDataFileStream 	<< MJoint[0] << ","
+																<< MJoint[1] << ","
+																<< MJoint[2] << ","
+																<< MJoint[3] << ","
+																<< MJoint[4] << ","
+																<< MJoint[5] << ","
+																<< MJoint[6] << ","
+																<< force(0)  << ","
+																<< force(2)  << ","
+																<< x_new(0)  << ","
+																<< x_new(1)  << ","
+																<< x_new(2)  << ","
+																<< x_new(3)  << ","
+																<< x_new(4)  << ","
+																<< x_new(5)  << ","
+																<< (int) targetPos  << ","
+																<< damping(0,0)  << ","
+																<< xdot_filt(0) << ","
+																<< xdotdot_filt(0) << std::endl;
 
-					 /* Triggered when trial is not running and target (neutral position) is first reached */
-					 if (!targetReached && withinErrorBound){
-						 targetReached = true;
-						 trialWaitCounter = 0;
-						 trialWaitTime = rand() % 1000 + 500;
-					 }
+						/*
+						 * Trials are designed as the following.  Before the trial, a target
+						 * is position is set, the trial is then started.  The subject must
+						 * travel to the target position, within it's error bounds. As soon as
+						 * the target is reached, the trial will last for only the next two seconds.
+						 * Once those two seconds are up, the trial is ended.
+						 */
 
-					 /* Keep iteration count after target is first reached */
-					 if (targetReached){
-						 trialWaitCounter++;
+						/* Triggered when trial is running and target is first reached */
+						if (!targetReached && withinErrorBound){
+			 				targetReached = true;
+							trialSettleIterCount = 0;
+			 			}
 
-						 /* Start Trial --- This occurs 0.5-1.5 seconds after the neutral position is first reached */
-						 if (trialWaitCounter >= trialWaitTime){
-							 if (trialNumber < nTrialsPerGroup){
+						/* Keep iteration count after target is first reached */
+						if (targetReached){
+							trialSettleIterCount++;
+
+							/* End Trial --- This occurs 2 secs after the target was reached */
+							if (trialSettleIterCount >= trialEndIterCount){
 								targetReached = false;
-								trialRunning = true;
-							 	targetPos = (TargetPosition) (trialDirSeq(trialNumber) + 1);
+								trialRunning = false;
+								targetPos = TargetPosition::NEUTRAL;
 
-								/* Make trial directory */
-								trialDir = std::string("Trial") + std::to_string(trialNumber);
-								p_trial = p_subject /= path(trialDir);
-								create_directory(p_trial);
-
-								/* Create kuka data trial files */
-								p_kukadata = p_trial /= path(kukafilename);
-								CreateOrOpenKukaDataFile(kukaDataFileStream, p_kukadata);
-
-								/* Create emg hdf5 file */
+								/* Stop emg recording if necessary */
 								if (useEmg){
-									p_emgdata = p_trial /= path(emgfilename);
-									fileH5->close();
-									delete fileH5;
-									fileH5 = CreateOrOpenH5File(p_emgdata.string());
-									emgClient.StartWriting(fileH5);
+									emgClient.StopWriting();
 								}
 							}
-							 else{
-								enough = true;		// ends group of trials
+						}
+					}
+					else{					// trial not running
+						/*
+						 * Time between trial flows in the following manner. The subject
+						 * must move within the neutral position error bounds.  Once this occurs,
+						 * a random amount of time, between 0.5-1.5 seconds passes, then the trial
+						 * will start.
+						 */
+
+						 /* Triggered when trial is not running and target (neutral position) is first reached */
+						 if (!targetReached && withinErrorBound){
+							 targetReached = true;
+							 trialWaitCounter = 0;
+							 trialWaitTime = rand() % 1000 + 500;
+						 }
+
+						 /* Keep iteration count after target is first reached */
+						 if (targetReached){
+							 trialWaitCounter++;
+
+							 /* Start Trial --- This occurs 0.5-1.5 seconds after the neutral position is first reached */
+							 if (trialWaitCounter >= trialWaitTime){
+								 if (trialNumber < nTrialsPerGroup){
+									targetReached = false;
+									trialRunning = true;
+								 	targetPos = (TargetPosition) (trialDirSeq(trialNumber) + 1);
+									printf("Starting trial %d\n", trialNumber);
+									/* Make trial directory */
+									trialDir = std::string("Trial") + std::to_string(trialNumber);
+									p_trial = path(p_group.string()) /= path(trialDir);
+									create_directory(p_trial);
+
+									/* Create kuka data trial files */
+									p_kukadata = path(p_trial.string()) /= path(kukafilename);
+									CreateOrOpenKukaDataFile(kukaDataFileStream, p_kukadata);
+
+									/* Create emg hdf5 file */
+									if (useEmg){
+										p_emgdata = path(p_trial.string()) /= path(emgfilename);
+										fileH5->close();
+										delete fileH5;
+										fileH5 = CreateOrOpenH5File(p_emgdata.string());
+										emgClient.StartWriting(fileH5);
+									}
+								}
+								 else{
+									 	enough = true;		// ends group of trials
+								 }
+								 trialNumber++;
 							 }
-							 trialNumber++;
 						 }
 					 }
 				 }
@@ -745,7 +769,7 @@ int main(int argc, char** argv)
 			client.NextJoint[6] = -0.958709;
 
 			// Send data to visualizer gui
-			gui_data[0] = guiMode;
+			gui_data[0] = (double) guiMode;
 			gui_data[1] = neutralXY(0);
 			gui_data[2] = neutralXY(1);
 			gui_data[3] = d_r;
