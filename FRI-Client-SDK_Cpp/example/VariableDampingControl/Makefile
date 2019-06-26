@@ -10,7 +10,7 @@ include $(BASE_DIR)/build/GNUMake/$(TOOLS_MAK)
 # BOOST_DIR = /home/tannerbitz/Documents/cpp/boost_1_68_0 	# Tanner's Laptop
 BOOST_DIR = /usr/include/boost_1_70_0						# KUKA Computer
 CXXFLAGS 	+= 	-std=c++11 -pthread
-BOOST_INC 	= 	-I/usr/local/include $(BOOST_DIR)
+BOOST_INC 	= 	/usr/local/include $(BOOST_DIR)
 BOOST_LIB 	= 	-L/usr/local/lib/ 	\
 				-lboost_system 		\
 				-lpthread 			\
@@ -19,10 +19,9 @@ BOOST_LIB 	= 	-L/usr/local/lib/ 	\
 				-lboost_filesystem
 
 # ---------------- HDF ----------------------
-HDF_INSTALL = /usr/local/hdf5
-# HDF_LIB 	= $(HDF_INSTALL)/lib			# Tanner's laptop
-HDF_LIB 	= $(HDF_INSTALL)/lib64			# KUKA Computer
-HDF_INCLUDE = -I$(HDF_INSTALL)/include
+HDF_INSTALL 	= /usr/local/hdf5
+HDF_LIB 	= $(HDF_INSTALL)/lib			
+HDF_INCLUDE	= $(HDF_INSTALL)/include
 HDF_LIBS 	= -L$(HDF_LIB)	\
 			  -lhdf5_cpp	\
 			  -lhdf5 		\
@@ -47,7 +46,7 @@ CXXFLAGS 		+= -std=c++11 -pthread
 LDFLAGS 		+= $(LIB_DIR)/libFRIClient.a
 LDFLAGS			+= $(HDF_LIBS)
 LDFLAGS			+= $(BOOST_LIB)
-INCLUDE 		= 	-I/usr/include/	\
+INC_DIR 		+=/usr/include/	\
 					$(HDF_INCLUDE)	\
 					$(BOOST_INC)
 

@@ -70,8 +70,8 @@ enum class TargetPosition{
 int main(int argc, char** argv)
 {
 	/* Setup damping modes */
-	std::vector<int> groupDampingModes 	= {4,4,2,3,1,3,3,2,2,1,3,3,1,2,2,1,1};
-	std::vector<int> groupDirectionSeq 	= {1,2,1,1,4,0,4,0,4,3,2,3,1,2,3,2,0};
+	std::vector<int> groupDampingModes 	= {4,4,3,3,2,3,1,3,3,2,2,1,3,3,1,2,2,1,1};
+	std::vector<int> groupDirectionSeq 	= {1,2,1,4,1,1,4,0,4,0,4,3,2,3,1,2,3,2,0};
 
 	const int nTrialsPerGroup = 10;
 	Matrix<int,5,nTrialsPerGroup> directionSequences;
@@ -361,7 +361,7 @@ int main(int argc, char** argv)
 	// Initialize stiffness, damping, and inertia matrices
 	MatrixXd inertia(6, 6);
 	MatrixXd stiffness(6, 6);
-	MatrixXd damping(6, 6); 
+	MatrixXd damping(6, 6);
 
 
 
