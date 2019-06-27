@@ -65,6 +65,10 @@ enum class TargetPosition{
 	UP,		// 4
 };
 
+enum class MovementDirection{
+	LEFT_RIGHT = 1,
+	DOWN_UP
+};
 
 // Main
 int main(int argc, char** argv)
@@ -76,10 +80,11 @@ int main(int argc, char** argv)
 	const int nTrialsPerGroup = 10;
 	Matrix<int,5,nTrialsPerGroup> directionSequences;
 	directionSequences << 1, 1, 0, 0, 0, 0, 1, 0, 1, 0,
-						  0, 0, 1, 1, 1, 1, 0, 0, 1, 0,
-						  0, 0, 1, 0, 1, 1, 0, 0, 1, 1,
-						  1, 0, 1, 0, 1, 0, 0, 1, 1, 1,
-						  1, 1, 0, 1, 0, 0, 0, 0, 1, 1;
+											  0, 0, 1, 1, 1, 1, 0, 0, 1, 0,
+											  0, 0, 1, 0, 1, 1, 0, 0, 1, 1,
+											  1, 0, 1, 0, 1, 0, 0, 1, 1, 1,
+											  1, 1, 0, 1, 0, 0, 0, 0, 1, 1;
+
 	Matrix<int,1,nTrialsPerGroup> trialDirSeq;
 	DampingMode groupDamping;
 
@@ -111,8 +116,6 @@ int main(int argc, char** argv)
 	}
 	else{
 		groupDamping = (DampingMode) groupDampingModes[groupNumber];
-		int trialDirSeqInd = groupDirectionSeq[groupNumber];
-		trialDirSeq << directionSequences.row(trialDirSeqInd);
 		printf("Group: %d\n", groupNumber);
 	}
 
@@ -123,6 +126,7 @@ int main(int argc, char** argv)
 	const double DEFAULT_KN = 32.81;
 	double kp;
 	double kn;
+	MovementDirection moveDir = MovementDirection::LEFT_RIGHT;
 
 	bool useEmg = false;
 	bool kpInputted = false;
@@ -153,6 +157,12 @@ int main(int argc, char** argv)
 		else if (argKey.compare("KN") == 0){
 			knInputted = true;
 			kn = std::stod(argVal);
+		}
+		else if (argKey.compare("MD") == 0){
+			std::transform(argVal.begin(), argVal.end(), argVal.begin(), ::toupper);
+			if (argVal.compare("DU") == 0){
+				moveDir = MovementDirection::DOWN_UP;
+			}
 		}
 		else{
 			printf("Key: %s not understood\n", argKey.c_str());
@@ -203,6 +213,27 @@ int main(int argc, char** argv)
 		}
 	}
 
+	/* Check Movement Direction */
+	TargetPosition targetPos = TargetPosition::LEFT;
+	if (moveDir == MovementDirection::LEFT_RIGHT){
+			targetPos = TargetPosition::LEFT;
+			directionSequences += MatrixXi::Constant(5,nTrialsPerGroup,0);
+			printf("Movement Direction: Left-Right\n");
+	}
+	else if (moveDir == MovementDirection::DOWN_UP){
+			targetPos = TargetPosition::DOWN;
+			directionSequences += MatrixXi::Constant(5,nTrialsPerGroup,2);
+			printf("Movement Direction: Down-Up\n");
+	}
+	else{
+			printf("Movement direction had an error!");
+			exit(1);
+	}
+
+	/* Define target positions */
+	int trialDirSeqInd = groupDirectionSeq[groupNumber];
+	trialDirSeq << directionSequences.row(trialDirSeqInd);
+
 	// UDP Server address and port hardcoded now -- change later
 	UDPServer udp_server(udp_addr_gui, udp_port_gui);
 
@@ -246,7 +277,7 @@ int main(int argc, char** argv)
 	float dt = 0.001;
 	double b_var;					// Variable damping
 	double b_LB = -20;				// Lower bound of damping
-	double b_UB = 10;				// Upper bound of damping
+	double b_UB = 20;				// Upper bound of damping
 	MatrixXd x_new_filt(6, 1); x_new_filt << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_new_filt_old(6, 1); x_new_filt_old << 0, 0, 0, 0, 0, 0;
 	MatrixXd xdot_filt(6, 1); xdot_filt << 0, 0, 0, 0, 0, 0;
@@ -310,7 +341,6 @@ int main(int argc, char** argv)
 
 	/* Variables related to defining target*/
 	int guiMode = 2;
-	TargetPosition targetPos = TargetPosition::LEFT;
 	MatrixXd neutralXY(2, 1); neutralXY << 0, 0.76;
 	MatrixXd endEffectorXY(2, 1); endEffectorXY << 0, 0;
 	MatrixXd targetXY(2, 1); targetXY << 0, 0;
@@ -519,7 +549,7 @@ int main(int argc, char** argv)
 											0, 0, 0, 0, 0.5, 0,
 											0, 0, 0, 0, 0, 0.5;
 
-					inertia << 7, 0, 0, 0, 0, 0,
+					inertia << 10, 0, 0, 0, 0, 0,
 										 0, 0.000001, 0, 0, 0, 0,
 										 0, 0, 10, 0, 0, 0,
 										 0, 0, 0, 0.0001, 0, 0,
@@ -547,12 +577,12 @@ int main(int argc, char** argv)
 				 /* Set target placement */
 	 			if (targetPos == TargetPosition::LEFT)
 	 			{
-	 				targetXY(0) = neutralXY(0) + 0.06;
+	 				targetXY(0) = neutralXY(0) + 0.12;
 	 				targetXY(1) = neutralXY(1);
 	 			}
 	 			else if (targetPos == TargetPosition::RIGHT)
 	 			{
-	 				targetXY(0) = neutralXY(0) - 0.06;
+	 				targetXY(0) = neutralXY(0) - 0.12;
 	 				targetXY(1) = neutralXY(1);
 	 			}
 	 			else if (targetPos == TargetPosition::NEUTRAL)
@@ -560,6 +590,16 @@ int main(int argc, char** argv)
 	 				targetXY(0) = neutralXY(0);
 	 				targetXY(1) = neutralXY(1);
 	 			}
+				else if (targetPos == TargetPosition::DOWN)
+	 			{
+	 				targetXY(0) = neutralXY(0);
+	 				targetXY(1) = neutralXY(1) + 0.12;
+	 			}
+				else if (targetPos == TargetPosition::UP)
+				{
+					targetXY(0) = neutralXY(0);
+					targetXY(1) = neutralXY(1) - 0.12;
+				}
 
 				withinErrorBound = (pow((endEffectorXY(0) - targetXY(0)),2) + pow((endEffectorXY(1) - targetXY(1)),2) <= pow(radius_e,2));
 				/*
@@ -591,9 +631,14 @@ int main(int argc, char** argv)
 																<< x_new(3)  << ","
 																<< x_new(4)  << ","
 																<< x_new(5)  << ","
-																<< (int) targetPos  << ","
-																<< damping(0,0)  << ","
-																<< xdot_filt(0) << ","
+																<< (int) targetPos  << ",";
+						if (moveDir == MovementDirection::LEFT_RIGHT){
+							kukaDataFileStream << damping(0,0) << ",";
+						}
+						else if (moveDir == MovementDirection::DOWN_UP){
+							kukaDataFileStream << damping(2,2) << ",";
+						}
+						kukaDataFileStream	<< xdot_filt(0) << ","
 																<< xdotdot_filt(0) << std::endl;
 
 						/*
@@ -698,16 +743,36 @@ int main(int argc, char** argv)
 
 				/* Calculate damping */
 				if (groupDamping == DampingMode::POSITIVE){
-					damping(0,0) = b_UB;
+					if (moveDir == MovementDirection::LEFT_RIGHT){
+						damping(0,0) = b_UB;
+					}
+					else if (moveDir == MovementDirection::DOWN_UP){
+						damping(2,2) = b_UB;
+					}
 				}
 				else if (groupDamping == DampingMode::NEGATIVE){
-					damping(0,0) = b_LB;
+					if (moveDir == MovementDirection::LEFT_RIGHT){
+						damping(0,0) = b_LB;
+					}
+					else if (moveDir == MovementDirection::DOWN_UP){
+						damping(2,2) = b_LB;
+					}
 				}
 				else if (groupDamping == DampingMode::VARIABLE){
-					damping(0,0) = b_var;
+					if (moveDir == MovementDirection::LEFT_RIGHT){
+						damping(0,0) = b_var;
+					}
+					else if (moveDir == MovementDirection::DOWN_UP){
+						damping(2,2) = b_var;
+					}
 				}
 				else if (groupDamping == DampingMode::ZERO){
-					damping(0,0) = 0;
+					if (moveDir == MovementDirection::LEFT_RIGHT){
+						damping(0,0) = 0;
+					}
+					else if (moveDir == MovementDirection::DOWN_UP){
+						damping(2,2) = 0;
+					}
 				}
 
 				// Shift old position/pose vectors, calculate new position
@@ -779,7 +844,12 @@ int main(int argc, char** argv)
 			gui_data[7] = targetXY(0);
 			gui_data[8] = targetXY(1);
 			gui_data[9] = ex_r;
-			gui_data[10] = damping(0, 0);
+			if (moveDir == MovementDirection::LEFT_RIGHT){
+				gui_data[10] = damping(0, 0);
+			}
+			else if (moveDir == MovementDirection::DOWN_UP){
+				gui_data[10] = damping(2, 2);
+			}
 			udp_server.Send(gui_data, 16);
 		}
 	}
