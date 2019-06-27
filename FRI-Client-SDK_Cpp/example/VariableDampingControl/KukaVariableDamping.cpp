@@ -293,7 +293,9 @@ int main(int argc, char** argv)
 	float dt = 0.001;
 	double b_var;					// Variable damping
 	double b_LB = -20;				// Lower bound of damping
-	double b_UB = 20;				// Upper bound of damping
+	double b_UB = 40;				// Upper bound of damping
+	double dampingDefaultMinorDir = 40;		// default damping value in direction that the trial is not going.
+																				// ex: if moveDir == LEFT_RIGHT (along x-axis), the this is the DOWN_UP (y-axis) damping
 	MatrixXd x_new_filt(6, 1); x_new_filt << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_new_filt_old(6, 1); x_new_filt_old << 0, 0, 0, 0, 0, 0;
 	MatrixXd xdot_filt(6, 1); xdot_filt << 0, 0, 0, 0, 0, 0;
@@ -558,12 +560,12 @@ int main(int argc, char** argv)
 											 0, 0, 0, 0, 1000000, 0,
 											 0, 0, 0, 0, 0, 1000000;
 
-					damping << 30, 0, 0, 0, 0, 0,
-											0, 100, 0, 0, 0, 0,
-											0, 0, 30, 0, 0, 0,
-											0, 0, 0, 0.5, 0, 0,
-											0, 0, 0, 0, 0.5, 0,
-											0, 0, 0, 0, 0, 0.5;
+					damping << dampingDefaultMinorDir,   0, 										 0,   0,   0,   0,
+																					0, 100, 										 0,   0,   0,   0,
+																					0,   0, dampingDefaultMinorDir,   0,   0,   0,
+																					0, 	 0, 										 0, 0.5,   0,   0,
+																					0,   0, 										 0,   0, 0.5,   0,
+																					0, 	 0, 										 0, 	0, 	 0, 0.5;
 
 					inertia << 10, 0, 0, 0, 0, 0,
 										 0, 0.000001, 0, 0, 0, 0,
