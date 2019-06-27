@@ -243,9 +243,25 @@ int main(int argc, char** argv)
 	std::string subjectDir = "Subject" + std::to_string(subjectNumber);
 	path p_subject = path(p_base.string()) /= path(subjectDir);
 	create_directory(p_subject);
+
+	// Movement direction directory
+	std::string directionDir;
+	if (moveDir == MovementDirection::LEFT_RIGHT){
+		directionDir = "Left_Right";
+	}
+	else if (moveDir == MovementDirection::DOWN_UP){
+		directionDir = "Down_Up";
+	}
+	else{
+		printf("Movement Direction not set properly\n");
+		exit(1);
+	}
+	path p_direction = path(p_subject.string()) /= path(directionDir);
+	create_directory(p_direction);
+
 	// group directory
 	std::string groupDir = "Group" + std::to_string(groupNumber);
-	path p_group = path(p_subject.string()) /= path(groupDir);
+	path p_group = path(p_direction.string()) /= path(groupDir);
 	create_directory(p_group);
 
 	std::string trialDir;
