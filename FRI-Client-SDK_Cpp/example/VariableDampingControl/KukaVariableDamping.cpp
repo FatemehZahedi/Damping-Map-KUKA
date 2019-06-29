@@ -216,13 +216,9 @@ int main(int argc, char** argv)
 	/* Check Movement Direction */
 	TargetPosition targetPos = TargetPosition::LEFT;
 	if (moveDir == MovementDirection::LEFT_RIGHT){
-			targetPos = TargetPosition::LEFT;
-			directionSequences += MatrixXi::Constant(5,nTrialsPerGroup,0);
 			printf("Movement Direction: Left-Right\n");
 	}
 	else if (moveDir == MovementDirection::DOWN_UP){
-			targetPos = TargetPosition::DOWN;
-			directionSequences += MatrixXi::Constant(5,nTrialsPerGroup,2);
 			printf("Movement Direction: Down-Up\n");
 	}
 	else{
@@ -363,6 +359,7 @@ int main(int argc, char** argv)
 	MatrixXd endEffectorXY(2, 1); endEffectorXY << 0, 0;
 	MatrixXd targetXY(2, 1); targetXY << 0, 0;
 	bool withinErrorBound;
+	double distFromNeutral = 0.12;  // 12 cm
 
 	/* Variables related to defining new trial*/
 	int trialSettleIterCount = 0;
@@ -595,12 +592,12 @@ int main(int argc, char** argv)
 				 /* Set target placement */
 	 			if (targetPos == TargetPosition::LEFT)
 	 			{
-	 				targetXY(0) = neutralXY(0) + 0.12;
+	 				targetXY(0) = neutralXY(0) + distFromNeutral;
 	 				targetXY(1) = neutralXY(1);
 	 			}
 	 			else if (targetPos == TargetPosition::RIGHT)
 	 			{
-	 				targetXY(0) = neutralXY(0) - 0.12;
+	 				targetXY(0) = neutralXY(0) - distFromNeutral;
 	 				targetXY(1) = neutralXY(1);
 	 			}
 	 			else if (targetPos == TargetPosition::NEUTRAL)
@@ -611,12 +608,12 @@ int main(int argc, char** argv)
 				else if (targetPos == TargetPosition::DOWN)
 	 			{
 	 				targetXY(0) = neutralXY(0);
-	 				targetXY(1) = neutralXY(1) + 0.12;
+	 				targetXY(1) = neutralXY(1) + distFromNeutral;
 	 			}
 				else if (targetPos == TargetPosition::UP)
 				{
 					targetXY(0) = neutralXY(0);
-					targetXY(1) = neutralXY(1) - 0.12;
+					targetXY(1) = neutralXY(1) - distFromNeutral;
 				}
 
 				withinErrorBound = (pow((endEffectorXY(0) - targetXY(0)),2) + pow((endEffectorXY(1) - targetXY(1)),2) <= pow(radius_e,2));
@@ -648,15 +645,15 @@ int main(int argc, char** argv)
 																<< x_new(2)  << ","
 																<< x_new(3)  << ","
 																<< x_new(4)  << ","
-																<< x_new(5)  << ","
-																<< (int) targetPos  << ",";
-						if (moveDir == MovementDirection::LEFT_RIGHT){
-							kukaDataFileStream << damping(0,0) << ",";
+																<< x_new(5)  << ",";
+						if (moveDir == MovementDirection::DOWN_UP){
+							kukaDataFileStream << (int) targetPos + 2 << ",";
 						}
-						else if (moveDir == MovementDirection::DOWN_UP){
-							kukaDataFileStream << damping(2,2) << ",";
+						else if (moveDir == MovementDirection::LEFT_RIGHT){
+							kukaDataFileStream << (int) targetPos << ",";
 						}
-						kukaDataFileStream	<< xdot_filt(0) << ","
+						kukaDataFileStream  << damping(0,0) << ","
+																<< xdot_filt(0) << ","
 																<< xdotdot_filt(0) << std::endl;
 
 						/*
@@ -761,37 +758,19 @@ int main(int argc, char** argv)
 
 				/* Calculate damping */
 				if (groupDamping == DampingMode::POSITIVE){
-					if (moveDir == MovementDirection::LEFT_RIGHT){
 						damping(0,0) = b_UB;
-					}
-					else if (moveDir == MovementDirection::DOWN_UP){
-						damping(2,2) = b_UB;
-					}
 				}
 				else if (groupDamping == DampingMode::NEGATIVE){
-					if (moveDir == MovementDirection::LEFT_RIGHT){
 						damping(0,0) = b_LB;
-					}
-					else if (moveDir == MovementDirection::DOWN_UP){
-						damping(2,2) = b_LB;
-					}
 				}
 				else if (groupDamping == DampingMode::VARIABLE){
-					if (moveDir == MovementDirection::LEFT_RIGHT){
 						damping(0,0) = b_var;
-					}
-					else if (moveDir == MovementDirection::DOWN_UP){
-						damping(2,2) = b_var;
-					}
 				}
 				else if (groupDamping == DampingMode::ZERO){
-					if (moveDir == MovementDirection::LEFT_RIGHT){
 						damping(0,0) = 0;
 					}
-					else if (moveDir == MovementDirection::DOWN_UP){
-						damping(2,2) = 0;
-					}
-				}
+
+
 
 				// Shift old position/pose vectors, calculate new position
 				x_oldold << x_old;
@@ -852,23 +831,35 @@ int main(int argc, char** argv)
 			client.NextJoint[6] = -0.958709;
 
 			// Send data to visualizer gui
-			gui_data[0] = (double) guiMode;
-			gui_data[1] = neutralXY(0);
-			gui_data[2] = neutralXY(1);
-			gui_data[3] = d_r;
-			gui_data[4] = endEffectorXY(0);
-			gui_data[5] = endEffectorXY(1);
-			gui_data[6] = u_r;
-			gui_data[7] = targetXY(0);
-			gui_data[8] = targetXY(1);
-			gui_data[9] = ex_r;
 			if (moveDir == MovementDirection::LEFT_RIGHT){
+				gui_data[0] = (double) guiMode;
+				gui_data[1] = neutralXY(0);
+				gui_data[2] = neutralXY(1);
+				gui_data[3] = d_r;
+				gui_data[4] = endEffectorXY(0);
+				gui_data[5] = endEffectorXY(1);
+				gui_data[6] = u_r;
+				gui_data[7] = targetXY(0);
+				gui_data[8] = targetXY(1);
+				gui_data[9] = ex_r;
 				gui_data[10] = damping(0, 0);
 			}
 			else if (moveDir == MovementDirection::DOWN_UP){
-				gui_data[10] = damping(2, 2);
+				gui_data[0] = (double) guiMode;
+				gui_data[1] = neutralXY(1);
+				gui_data[2] = neutralXY(0);
+				gui_data[3] = d_r;
+				gui_data[4] = endEffectorXY(1);
+				gui_data[5] = endEffectorXY(0);
+				gui_data[6] = u_r;
+				gui_data[7] = targetXY(1);
+				gui_data[8] = targetXY(0);
+				gui_data[9] = ex_r;
+				gui_data[10] = damping(0, 0);
 			}
+
 			udp_server.Send(gui_data, 16);
+
 		}
 	}
 
