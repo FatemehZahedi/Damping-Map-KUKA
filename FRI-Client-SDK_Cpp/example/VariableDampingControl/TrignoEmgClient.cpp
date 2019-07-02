@@ -238,13 +238,34 @@ void TrignoEmgClient::ReceiveDataStream(){
         else{       // no error
             /* Save to data queue if specified by flag */
             if (_writeFlag){
-                memcpy(&(_dataArr[_rowCount][0]), _replyComm, n);
+                memcpy(&(_dataArr[_rowCount][0]), _replyData, n);
                 _rowCount += samplesAvailable;
                 if (_rowCount == chunkRows){
                     WriteH5Chunk();
                     _rowCount = 0;
                 }
                 rowsFreeInBuff = chunkRows - _rowCount;
+            }
+            else if (_writeToFileStreamFlag){
+              memcpy(_dataArrFileStream, _replyData, n);
+              for (int iSample=0; iSample<samplesAvailable; iSample++){
+                _ofs << _dataArrFileStream[iSample][0] << ","
+                    << _dataArrFileStream[iSample][1] << ","
+                    << _dataArrFileStream[iSample][2] << ","
+                    << _dataArrFileStream[iSample][3] << ","
+                    << _dataArrFileStream[iSample][4] << ","
+                    << _dataArrFileStream[iSample][5] << ","
+                    << _dataArrFileStream[iSample][6] << ","
+                    << _dataArrFileStream[iSample][7] << ","
+                    << _dataArrFileStream[iSample][8] << ","
+                    << _dataArrFileStream[iSample][9] << ","
+                    << _dataArrFileStream[iSample][10] << ","
+                    << _dataArrFileStream[iSample][11] << ","
+                    << _dataArrFileStream[iSample][12] << ","
+                    << _dataArrFileStream[iSample][13] << ","
+                    << _dataArrFileStream[iSample][14] << ","
+                    << _dataArrFileStream[iSample][15] << "\n";
+              }
             }
 
         }
@@ -353,7 +374,13 @@ void TrignoEmgClient::WriteH5Chunk(){
       }
     }
     else{
-      mspace.selectAll();
+      hsize_t colDims[rank]   = {(hsize_t) _rowCount, 1};
+      hsize_t offset[rank]    = {0, 0};
+      /* select column by column */
+      for (int i = 0; i<_nActiveEmgSensors; i++){
+          offset[1] = i;
+          mspace.selectHyperslab(H5S_SELECT_OR, colDims, offset);
+      }
     }
 
     /* write to file */
@@ -366,4 +393,33 @@ void TrignoEmgClient::StopReceiveDataStream(){
 
 bool TrignoEmgClient::IsWriting(){
     return _writeFlag;
+}
+
+void TrignoEmgClient::StartWritingFileStream(path filepath){
+  /* deconstruct filepath into path, filename, extension */
+	path pp = filepath.parent_path();
+	path fname_stem = filepath.stem();
+	path fname_ext = filepath.extension();
+
+	/* Make a path to rename old file with same path, and rename if necessary */
+	path p_unsuc = path(filepath.string());
+	int unsuc_count = 1;
+	std::string fname_unsuc;
+	if (is_regular_file(p_unsuc)){
+		while (is_regular_file(p_unsuc)){
+			fname_unsuc = fname_stem.string() + std::string("_unsuccessful_") + std::to_string(unsuc_count) + fname_ext.string();
+			p_unsuc = path(pp.string()) /= path(fname_unsuc);
+			unsuc_count++;
+		}
+		rename(filepath, p_unsuc);
+	}
+
+  /* Start file stream */
+    _ofs.close();
+    _ofs.open(filepath);
+    _writeToFileStreamFlag = true;
+}
+
+void TrignoEmgClient::StopWritingFileStream(){
+  _writeToFileStreamFlag = false;
 }

@@ -6,8 +6,13 @@
 #include <array>
 #include <queue>
 #include "H5Cpp.h"
+/* Boost filesystem */
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/path.hpp>
 
 using boost::asio::ip::tcp;
+using namespace boost::filesystem;
 using namespace H5;
 
 class TrignoEmgClient{
@@ -67,12 +72,18 @@ private:
 	/* Reply Variables */
 	static const int MAXLENGTH = 1024;
     static const int MAXDATALENGTH = 64000;  // 1000 rows * 16 floats * 4 bytes per float
-	char _replyComm[MAXLENGTH];
+	char _replyComm[MAXDATALENGTH];
 	char _replyData[MAXDATALENGTH];
 
     /* Emg List */
     int * _emgList;
     int _nActiveEmgSensors = 16;
+
+    /* Filestream */
+    boost::filesystem::ofstream _ofs;
+    bool _writeToFileStreamFlag = false;
+      float _dataArrFileStream[chunkRows][_nSensors];
+
 
 	/* Functions */
     void GetReplyComm();
@@ -101,4 +112,7 @@ public:
     /* Start/Stop writing data */
     void StartWriting(H5Location * h5loc);
     void StopWriting();
+
+    void StartWritingFileStream(path filepath);
+    void StopWritingFileStream();
 };

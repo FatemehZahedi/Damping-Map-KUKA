@@ -48,7 +48,7 @@ const int 			udp_port_gui = 50000;
 template<typename T>
 T * InitSharedMemory(std::string shmAddr, int nElements);
 void CreateOrOpenKukaDataFile(boost::filesystem::ofstream & ofs, path kukaDataFilePath);
-
+H5File * CreateH5File(path emgDataFilePath);
 
 enum class DampingMode{
 	POSITIVE = 1,
@@ -201,9 +201,9 @@ int main(int argc, char** argv)
 	TrignoEmgClient emgClient;
 	if (useEmg){
 		emgClient.SetIpAddress(emgIpAddr);
-		const int nEmgs = 4;
-		int emgList[nEmgs] = {1,2,3,4};
-		emgClient.SetEmgToSave(emgList, nEmgs);
+		// const int nEmgs = 6;
+		// int emgList[nEmgs] = {1,2,3,5,6,8};
+		// emgClient.SetEmgToSave(emgList, nEmgs);
 		emgClient.ConnectDataPort();
 		emgClient.ConnectCommPort();
 		if (emgClient.IsCommPortConnected()){
@@ -266,9 +266,10 @@ int main(int argc, char** argv)
 	path p_emgdata;
 	boost::filesystem::ofstream kukaDataFileStream;
 
-	/* HDF5 File */
-	H5File * fileH5 = new H5File();
-	std::string emgfilename = "EmgData.h5";
+	/* EMG File */
+	// H5File * fileH5 = new H5File();
+	// std::string emgfilename = "EmgData.h5";
+	std::string emgfilename = "EmgData.txt";
 
 	/* Kuka Data File */
 	std::string kukafilename = "KukaData.txt";
@@ -289,8 +290,8 @@ int main(int argc, char** argv)
 	float dt = 0.001;
 	double b_var;					// Variable damping
 	double b_LB = -20;				// Lower bound of damping
-	double b_UB = 40;				// Upper bound of damping
-	double dampingDefaultMinorDir = 40;		// default damping value in direction that the trial is not going.
+	double b_UB = 60;				// Upper bound of damping
+	double dampingDefaultMinorDir = 60;		// default damping value in direction that the trial is not going.
 																				// ex: if moveDir == LEFT_RIGHT (along x-axis), the this is the DOWN_UP (y-axis) damping
 	MatrixXd x_new_filt(6, 1); x_new_filt << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_new_filt_old(6, 1); x_new_filt_old << 0, 0, 0, 0, 0, 0;
@@ -359,7 +360,7 @@ int main(int argc, char** argv)
 	MatrixXd endEffectorXY(2, 1); endEffectorXY << 0, 0;
 	MatrixXd targetXY(2, 1); targetXY << 0, 0;
 	bool withinErrorBound;
-	double distFromNeutral = 0.12;  // 12 cm
+	double distFromNeutral = 0.10;  // 10 cm
 
 	/* Variables related to defining new trial*/
 	int trialSettleIterCount = 0;
@@ -682,7 +683,7 @@ int main(int argc, char** argv)
 
 								/* Stop emg recording if necessary */
 								if (useEmg){
-									emgClient.StopWriting();
+									emgClient.StopWritingFileStream();
 								}
 							}
 						}
@@ -725,10 +726,10 @@ int main(int argc, char** argv)
 									/* Create emg hdf5 file */
 									if (useEmg){
 										p_emgdata = path(p_trial.string()) /= path(emgfilename);
-										fileH5->close();
-										delete fileH5;
-										fileH5 = CreateOrOpenH5File(p_emgdata.string());
-										emgClient.StartWriting(fileH5);
+										// fileH5->close();
+										// delete fileH5;
+										// fileH5 = CreateH5File(p_emgdata);
+										emgClient.StartWritingFileStream(p_emgdata);
 									}
 								}
 								 else{
@@ -867,8 +868,8 @@ int main(int argc, char** argv)
 	app.disconnect();
 	sleep(0.5);
 	if (useEmg){
-		fileH5->close();
-		delete fileH5;
+		// fileH5->close();
+		// delete fileH5;
 		emgClient.StopReceiveDataStream();
 	}
 	sleep(0.5);
@@ -903,6 +904,31 @@ void CreateOrOpenKukaDataFile(boost::filesystem::ofstream & ofs, path kukaDataFi
 	ofs.open(kukaDataFilePath);
 }
 
+H5File * CreateH5File(path emgDataFilePath){
+	/* deconstruct kuka file path into path, filename, extension */
+	path pp = emgDataFilePath.parent_path();
+	path fname_stem = emgDataFilePath.stem();
+	path fname_ext = emgDataFilePath.extension();
+
+	/* Make a path to rename old file with same path, and rename if necessary */
+	path p_unsuc = path(emgDataFilePath.string());
+	int unsuc_count = 1;
+	std::string fname_unsuc;
+	if (is_regular_file(p_unsuc)){
+		while (is_regular_file(p_unsuc)){
+			fname_unsuc = fname_stem.string() + std::string("_unsuccessful_") + std::to_string(unsuc_count) + fname_ext.string();
+			p_unsuc = path(pp.string()) /= path(fname_unsuc);
+			unsuc_count++;
+		}
+		rename(emgDataFilePath, p_unsuc);
+
+	}
+
+	std::string filepathStr = emgDataFilePath.string();
+
+	H5File * file = new H5File(filepathStr.c_str(), H5F_ACC_TRUNC);
+	return file;
+}
 
 // Shared Memory-------------------------------------------------------
 template<typename T>
