@@ -4,7 +4,7 @@
 
 OBJ        		= $(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 DEP 				= $(SOURCES:%.cpp=$(OBJ_DIR)/%.d)
-INC_PARAMS		= $(INC_DIR:%=-I%) 
+INC_PARAMS		= $(INC_DIR:%=-I%)
 
 all: $(TARGET)
 
@@ -17,7 +17,7 @@ $(OBJ_DIR)/%.o: %.cpp $(OBJ_DIR)/%.d
 
 $(OBJ_DIR)/%.d: %.cpp
 	$(MKDIR) $(@D)
-	$(CXX) -MM $< -MT $(OBJ_DIR)/$*.o $(INC_PARAMS) > $@
+	$(CXX) -MM $< -MT $(OBJ_DIR)/$*.o $(CXXFLAGS) $(INC_PARAMS) > $@ 
 
 -include $(DEP)
 
