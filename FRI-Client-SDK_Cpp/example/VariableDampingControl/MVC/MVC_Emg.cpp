@@ -6,15 +6,10 @@
 #include <unistd.h>
 #include <math.h>
 #include <string.h>
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
 #include <time.h>
 #include <sys/shm.h>
 #include <eigen3/Eigen/Dense>
-#include "UdpServer.h"
 #include "TrignoEmgClient.h"
-#include "H5FunctionsNMCHRL.h"
 #include <algorithm>
 /* Boost filesystem */
 #include <boost/filesystem.hpp>
@@ -45,18 +40,17 @@ int main(int argc, char** argv)
 		emgIpAddr = std::string(argv[2]);
 	}
 
-	/* Check EMG use */
+	/* Init EMG Client */
 	TrignoEmgClient emgClient;
-	if (useEmg){
-		emgClient.SetIpAddress(emgIpAddr);
-		emgClient.ConnectDataPort();
-		emgClient.ConnectCommPort();
-		if (emgClient.IsCommPortConnected()){
-			emgClient.SendCommand(1); // this command signals the emg server to send readings to Data Port
-			std::thread emgReceiveThread(&TrignoEmgClient::ReceiveDataStream, &emgClient);
-			emgReceiveThread.detach();
-		}
+	emgClient.SetIpAddress(emgIpAddr);
+	emgClient.ConnectDataPort();
+	emgClient.ConnectCommPort();
+	if (emgClient.IsCommPortConnected()){
+		emgClient.SendCommand(1); // this command signals the emg server to send readings to Data Port
+		std::thread emgReceiveThread(&TrignoEmgClient::ReceiveDataStream, &emgClient);
+		emgReceiveThread.detach();
 	}
+
 
 	/* Make path */
 	path p_base = current_path();
@@ -65,7 +59,7 @@ int main(int argc, char** argv)
 	create_directory(p_subject);
 
 	/* Make Emg path */
-	std::string mcvFile = "MVC.txt";
+	std::string mvcFile = "MVC.txt";
 	path p_mvc = path(p_subject.string()) /= path(mvcFile);
 
 
@@ -74,6 +68,8 @@ int main(int argc, char** argv)
 	emgClient.StartWritingFileStream(p_mvc);
 
 
+
+	while(true){};
 
 
 	return 1;

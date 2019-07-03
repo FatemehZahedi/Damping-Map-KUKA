@@ -201,9 +201,6 @@ int main(int argc, char** argv)
 	TrignoEmgClient emgClient;
 	if (useEmg){
 		emgClient.SetIpAddress(emgIpAddr);
-		// const int nEmgs = 6;
-		// int emgList[nEmgs] = {1,2,3,5,6,8};
-		// emgClient.SetEmgToSave(emgList, nEmgs);
 		emgClient.ConnectDataPort();
 		emgClient.ConnectCommPort();
 		if (emgClient.IsCommPortConnected()){
@@ -726,9 +723,6 @@ int main(int argc, char** argv)
 									/* Create emg hdf5 file */
 									if (useEmg){
 										p_emgdata = path(p_trial.string()) /= path(emgfilename);
-										// fileH5->close();
-										// delete fileH5;
-										// fileH5 = CreateH5File(p_emgdata);
 										emgClient.StartWritingFileStream(p_emgdata);
 									}
 								}
@@ -844,6 +838,9 @@ int main(int argc, char** argv)
 				gui_data[8] = targetXY(1);
 				gui_data[9] = ex_r;
 				gui_data[10] = damping(0, 0);
+				gui_data[11] = (float) (trialNumber);
+				gui_data[12] = (float) nTrialsPerGroup;
+
 			}
 			else if (moveDir == MovementDirection::DOWN_UP){
 				gui_data[0] = (double) guiMode;
@@ -857,6 +854,8 @@ int main(int argc, char** argv)
 				gui_data[8] = targetXY(0);
 				gui_data[9] = ex_r;
 				gui_data[10] = damping(0, 0);
+				gui_data[11] = (float) (trialNumber);
+				gui_data[12] = (float) nTrialsPerGroup;
 			}
 
 			udp_server.Send(gui_data, 16);

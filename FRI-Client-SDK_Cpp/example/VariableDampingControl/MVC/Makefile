@@ -1,4 +1,4 @@
-BASE_DIR	= ../..
+BASE_DIR	= ../../..
 include $(BASE_DIR)/build/GNUMake/paths.mak
 include $(BASE_DIR)/build/GNUMake/$(TOOLS_MAK)
 
@@ -35,7 +35,8 @@ HDF_LIBS 	= -L$(HDF_LIB)	\
 ###  COMPILING            								    ###
 ###############################################################
 
-SOURCES 	= MVC_Emg.cpp
+SOURCES 	= MVC_Emg.cpp \
+						TrignoEmgClient.cpp
 
 TARGET 		= MVC
 
