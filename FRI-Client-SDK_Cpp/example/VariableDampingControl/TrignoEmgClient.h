@@ -101,7 +101,7 @@ public:
     void ConnectDataPort();
     void ConnectCommPort();
     /* Commands */
-	void SendCommand(int cmd);
+	   void SendCommand(int cmd);
     /* Get Internal Status */
     bool IsCommPortConnected();
     bool IsDataPortConnected();
@@ -115,4 +115,6 @@ public:
 
     void StartWritingFileStream(path filepath);
     void StopWritingFileStream();
+
+    void IsSensorPaired(int sensorNumber);
 };

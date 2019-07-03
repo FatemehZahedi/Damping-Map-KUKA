@@ -423,3 +423,16 @@ void TrignoEmgClient::StartWritingFileStream(path filepath){
 void TrignoEmgClient::StopWritingFileStream(){
   _writeToFileStreamFlag = false;
 }
+
+void TrignoEmgClient::IsSensorPaired(int sensorNumber){
+    char cmdStr[50];
+    sprintf(cmdStr, "SENSOR %d PAIRED?\r\n\r\n", sensorNumber);
+    printf("Command: %s", cmdStr);
+    try{
+      _sockComm.send(boost::asio::buffer(cmdStr, strlen(cmdStr)));
+      this->GetReplyComm();
+    }
+    catch (std::exception & e){
+      printf("Exception Occured During Write: %s\n", e.what());
+    }
+}

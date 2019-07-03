@@ -204,6 +204,14 @@ int main(int argc, char** argv)
 		emgClient.ConnectDataPort();
 		emgClient.ConnectCommPort();
 		if (emgClient.IsCommPortConnected()){
+			/* Check if sensors are paired */
+			emgClient.IsSensorPaired(1);
+			emgClient.IsSensorPaired(2);
+			emgClient.IsSensorPaired(3);
+			emgClient.IsSensorPaired(5);
+			emgClient.IsSensorPaired(6);
+			emgClient.IsSensorPaired(8);
+
 			emgClient.SendCommand(1); // this command signals the emg server to send readings to Data Port
 			std::thread emgReceiveThread(&TrignoEmgClient::ReceiveDataStream, &emgClient);
 			emgReceiveThread.detach();
