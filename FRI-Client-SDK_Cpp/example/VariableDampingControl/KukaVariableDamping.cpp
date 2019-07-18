@@ -279,6 +279,8 @@ int main(int argc, char** argv)
 	/* Kuka Data File */
 	std::string kukafilename = "KukaData.txt";
 
+	/* Measured Torque */
+	double meas_torque[7];
 
 	/* Force Related Varibles */
 	double ftx;						// Force x-direction (filtered)
@@ -637,6 +639,7 @@ int main(int argc, char** argv)
 					/* Move through trial specifics */
 					if (trialRunning){		// trial running
 						/* Write To Kuka Data File */
+						memcpy(meas_torque, client.getMeasuredTorque(), sizeof(double)*7);
 						kukaDataFileStream 	<< MJoint[0] << ","
 																<< MJoint[1] << ","
 																<< MJoint[2] << ","
@@ -660,7 +663,15 @@ int main(int argc, char** argv)
 						}
 						kukaDataFileStream  << damping(0,0) << ","
 																<< xdot_filt(0) << ","
-																<< xdotdot_filt(0) << std::endl;
+																<< xdotdot_filt(0) << ","
+																<< meas_torque[0] << ","
+																<< meas_torque[1] << ","
+																<< meas_torque[2] << ","
+																<< meas_torque[3] << ","
+																<< meas_torque[4] << ","
+																<< meas_torque[5] << ","
+																<< meas_torque[6] << std::endl;
+
 
 						/*
 						 * Trials are designed as the following.  Before the trial, a target
