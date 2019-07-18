@@ -639,7 +639,7 @@ int main(int argc, char** argv)
 					/* Move through trial specifics */
 					if (trialRunning){		// trial running
 						/* Write To Kuka Data File */
-						memcpy(meas_torque, client.getMeasuredTorque(), sizeof(double)*7);
+						memcpy(meas_torque, client.GetMeasTorque(), sizeof(double)*7);
 						kukaDataFileStream 	<< MJoint[0] << ","
 																<< MJoint[1] << ","
 																<< MJoint[2] << ","
