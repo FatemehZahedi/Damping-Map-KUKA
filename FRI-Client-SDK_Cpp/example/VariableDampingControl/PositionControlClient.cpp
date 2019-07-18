@@ -102,8 +102,10 @@ double* PositionControlClient::GetMeasJoint()
      return MeasuredJoint;
 }
 
-
-
+double* PositionControlClient::GetMeasTorque(){
+    memcpy(MeasuredTorque, robotState().getMeasuredTorque(), sizeof(double)*7);
+    return MeasuredTorque;
+}
 
 //*********************************************************************************
 double* PositionControlClient::GetExtTor()

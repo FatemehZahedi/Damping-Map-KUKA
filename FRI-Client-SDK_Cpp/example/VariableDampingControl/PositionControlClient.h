@@ -34,6 +34,7 @@ public:
 	double* GetExtTor();
 	double* GetComJoint();
 	void onStateChange(ESessionState oldState, ESessionState newState);
+    double* GetMeasTorque();
 
 
 
@@ -46,6 +47,7 @@ private:
    	double MeasuredJoint[7];
    	double CommandedJoint[7];
    	double ExternalTorque[7];
+    double MeasuredTorque[7];
 
 public:
 	double MaxRadPerStep[7];
