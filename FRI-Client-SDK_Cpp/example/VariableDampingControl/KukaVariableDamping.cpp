@@ -886,8 +886,14 @@ int main(int argc, char** argv)
 	app.disconnect();
 	sleep(0.5);
 	if (useEmg){
-		// fileH5->close();
-		// delete fileH5;
+		/* Check if sensors are paired at the end of the trial*/
+		emgClient.IsSensorPaired(1);
+		emgClient.IsSensorPaired(2);
+		emgClient.IsSensorPaired(3);
+		emgClient.IsSensorPaired(5);
+		emgClient.IsSensorPaired(6);
+		emgClient.IsSensorPaired(8);
+
 		emgClient.StopReceiveDataStream();
 	}
 	sleep(0.5);

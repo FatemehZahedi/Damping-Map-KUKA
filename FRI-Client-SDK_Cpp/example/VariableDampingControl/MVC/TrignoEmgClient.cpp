@@ -170,7 +170,7 @@ void TrignoEmgClient::GetReplyComm(){
             temp = RemoveNewlines(temp);
 
             /* Print to command line */
-            printf("Server Reply: %s\n", temp.c_str());
+            printf("%s\n", temp.c_str());
         }
     }
     catch (std::exception & e){
@@ -426,8 +426,10 @@ void TrignoEmgClient::StopWritingFileStream(){
 
 void TrignoEmgClient::IsSensorPaired(int sensorNumber){
     char cmdStr[50];
+    char cmdStrNoNewline[50];
     sprintf(cmdStr, "SENSOR %d PAIRED?\r\n\r\n", sensorNumber);
-    printf("Command: %s", cmdStr);
+    sprintf(cmdStrNoNewline, "SENSOR %d PAIRED? ", sensorNumber);
+    printf("Command: %s", cmdStrNoNewline);
     try{
       _sockComm.send(boost::asio::buffer(cmdStr, strlen(cmdStr)));
       this->GetReplyComm();
