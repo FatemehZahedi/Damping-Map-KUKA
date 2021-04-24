@@ -35,10 +35,13 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 
 
 */
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
-#include "LBRWrenchSineOverlayClient.h"
+// local headers
+#include "LBRWrenchSineOverlay/LBRWrenchSineOverlayClient.h"
+
+// std lib
+#include <cstring>
+#include <cstdio>
+#include <cmath>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979
