@@ -1,17 +1,21 @@
 // UDP Server Headers
+#include "UdpServer/UdpServer.h"
+
+// std library
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <cstring>
+
+// linux headers
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <string>
-#include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include "UdpServer.h"
 
 
 UDPServer::UDPServer(std::string addr, int port): _port(port), _addr(addr){

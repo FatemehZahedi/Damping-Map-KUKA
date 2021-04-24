@@ -1,25 +1,36 @@
-#include <sys/time.h>
-#include <iostream>
-#include <cmath>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <string.h>
+
+#include "TrignoEmgClient.h"
+#include "H5FunctionsNMCHRL.h"
+
+// UDP Server
+#include <UdpServer/UdpServer.h>
+
+// FRI Client
 #include "PositionControlClient.h"
 #include "friUdpConnection.h"
 #include "friClientApplication.h"
-#include <time.h>
-#include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
-#include "UdpServer.h"
-#include "TrignoEmgClient.h"
-#include "H5FunctionsNMCHRL.h"
+
+// std library
 #include <algorithm>
+#include <iostream>
+#include <cmath>
+#include <cstdlib>
+#include <cstdio>
+#include <ctime>
+#include <cstring>
+
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/shm.h>
+
+// Eigen
+#include <Eigen/Dense>
+
 /* Boost filesystem */
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
+
 /* HDF5 */
 #include "H5Cpp.h"
 
