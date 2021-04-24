@@ -1,4 +1,6 @@
-#include "friLBRClient.h"
+#pragma once
+
+#include <friLBRClient.h>
 
 using namespace KUKA::FRI;
 
@@ -7,22 +9,22 @@ using namespace KUKA::FRI;
  */
 class PositionControlClient : public LBRClient
 {
-
+   
 public:
-
+      
    /**
     * \brief Constructor.
-    *
+    * 
     */
    PositionControlClient();
-
-   /**
+   
+   /** 
     * \brief Destructor.
     */
    ~PositionControlClient();
+   
 
-
-
+   
    /**
     * \brief Callback for the FRI state 'Commanding Active'.
     */
@@ -34,13 +36,13 @@ public:
 	double* GetExtTor();
 	double* GetComJoint();
 	void onStateChange(ESessionState oldState, ESessionState newState);
+	
 
-
-
+      
 private:
-
+   
 	int SecTime;
-
+   	
    	double MaxJointLimitRad[7];
    	double MinJointLimitRad[7];
    	double MeasuredJoint[7];
@@ -55,8 +57,6 @@ public:
 	double LastJoint[7];
 	double NextJoint[7];
 	int KukaState;
-
-
-
-
 };
+
+

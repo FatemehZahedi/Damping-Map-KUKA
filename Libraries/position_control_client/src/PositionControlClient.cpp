@@ -1,13 +1,13 @@
-
-/**
-
-
-*/
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
+// local headers
 #include "PositionControlClient.h"
-#include "friLBRState.h"
+
+// fri lib
+#include <friLBRState.h>
+
+// std lib
+#include <cstring>
+#include <cstdio>
+#include <cmath>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979
@@ -24,7 +24,7 @@ PositionControlClient::~PositionControlClient() //destructor
 }
 
 //******************************************************************************
-void PositionControlClient::intvalues(double MRPStep[7], double MaxJLRad[7], double MinJLRad[7])
+void PositionControlClient::InitValues(double MRPStep[7], double MaxJLRad[7], double MinJLRad[7])
 {
 
     memcpy(MaxRadPerStep,MRPStep,7*sizeof(double));

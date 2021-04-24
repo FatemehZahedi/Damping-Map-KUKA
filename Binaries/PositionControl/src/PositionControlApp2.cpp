@@ -1,23 +1,24 @@
 
-/*
-  PositionControlApp
-*/
-//#include <chrono>
+#include <PositionControlClient.h>
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+
+#include <Eigen/Dense>
+
 #include <sys/time.h>
+#include <unistd.h>
+#include <sys/shm.h>
+
 #include <iostream>
 #include <cmath>
-//#include "engine.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <string.h> // strstr
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
-#include <time.h>
-#include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
+#include <cstdlib>
+#include <cstdio>
+#include <cmath>
+#include <cstring>
+#include <ctime>
+
+
+
 
 using namespace std;
 using namespace KUKA::FRI;
@@ -262,7 +263,7 @@ MatrixXd t_e(6,1); t_e << 0, 0, 0, 0, 0, 0;
 
     // create new joint position client
     PositionControlClient client;
-    client.intvalues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
+    client.InitValues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
 
 
 

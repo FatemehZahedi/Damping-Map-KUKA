@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 
 add_executable(AdmittanceControl
-  include/AdmittanceControl/PositionControlClient.h
   src/AdmittanceControl.cpp
-  src/PositionControlClient.cpp
 )
 
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
@@ -17,4 +15,5 @@ target_link_libraries(AdmittanceControl PUBLIC
   CONAN_PKG::eigen
   CONAN_PKG::boost
   CONAN_PKG::hdf5
+  PositionControlClient::PositionControlClient
 )

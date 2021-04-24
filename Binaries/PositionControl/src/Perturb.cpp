@@ -1,18 +1,21 @@
 
+#include <PositionControlClient.h>
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+
+#include <Eigen/Dense>
+
 #include <sys/time.h>
+#include <unistd.h>
+#include <sys/shm.h>
+
 #include <iostream>
 #include <cmath>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <string.h> // strstr
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
-#include <time.h>
-#include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
+#include <cstdlib>
+#include <cstdio>
+#include <cmath>
+#include <cstring>
+#include <ctime>
 
 using namespace std;
 using namespace KUKA::FRI;
@@ -44,9 +47,9 @@ int main(int argc, char** argv)
 	double velocity_mean = 0;
 	double error_delta = 0;
 	double checkval = 0;
-	double mag = 0.04;
+	double mag = 0.01;
 	//double dur = 1000;
-	double dur = 300;
+	double dur = 500;
 	int trig_stat = 0;
 	int outerdelay = 1;
 	int delay_gate = 0;
@@ -256,7 +259,7 @@ int main(int argc, char** argv)
 
 	// create new joint position client
 	PositionControlClient client;
-	client.intvalues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
+	client.InitValues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
 
 
 
@@ -276,6 +279,45 @@ int main(int argc, char** argv)
 
 	//create file for output
 	OutputFile = NewDataFile();
+	
+	//open trajectory file
+	//InputFile = fopen(filename, "r"); 
+/*
+	//get the first value in the file. This should be the number of rows(or the number of joint commands)
+	success2 = fscanf(InputFile, "%d", &rows);
+	//cout<<rows<<endl;
+	if (rows<4)
+	{
+		fprintf(stdout, "Number of Rows is %d\n Are you sure the file is in correct format?\n First number should be number of rows.  \nThen each row is 7 joint values in radians.\n", rows);
+		return 1;
+	} // probably should be commented
+	if (!success2)
+	{
+		fprintf(stdout, "Error in reading file!\n");
+		return 1;
+	}
+
+
+	//read in first 7 joint positions (these should be in radians)
+	success2 = fscanf(InputFile, "%lf %lf %lf %lf %lf %lf %lf", &client.NextJoint[0], &client.NextJoint[1], &client.NextJoint[2], &client.NextJoint[3], &client.NextJoint[4], &client.NextJoint[5], &client.NextJoint[6]);
+	memcpy(client.LastJoint, client.NextJoint, 7 * sizeof(double));
+	
+	if (!success2)
+	{
+	fprintf(stdout,"Error in reading file!\n");
+	return 1;
+	}	 // Probably should be commented
+*/
+	//*****************************---------------------------------------------------------------
+	//memcpy(MJoint, client.GetMeasJoint(), sizeof(double) * 7);
+	
+	/*client.NextJoint[0] = -1.570796;
+	client.NextJoint[1] = 1.570796;
+	client.NextJoint[2] = -1.570796;
+	client.NextJoint[3] = 0.523599;
+	client.NextJoint[4] = 1.570796;
+	client.NextJoint[5] = -1.570796;
+	client.NextJoint[6] = 1.0472;*/
 	
 	client.NextJoint[0] = -1.779862;
 	client.NextJoint[1] = 0.821814;
@@ -432,7 +474,7 @@ int main(int argc, char** argv)
 			MatrixXd Ja(6, 6); Ja << Tphi.inverse()*Jg;
 
 			//*****************
-/*
+
 			// Initializing Stiffness Damping and Inertia
 
 			/*MatrixXd stiffness(6, 6); stiffness << 10000, 0, 0, 0, 0, 0, //toward varun desk
@@ -440,7 +482,7 @@ int main(int argc, char** argv)
 				0, 0, 0, 0, 0, 0, //out toward workshop
 				0, 0, 0, 1000000, 0, 0,
 				0, 0, 0, 0, 1000000, 0,
-				0, 0, 0, 0, 0, 1000000;
+				0, 0, 0, 0, 0, 1000000;*/
 			MatrixXd stiffness(6, 6); stiffness << 0, 0, 0, 0, 0, 0, //toward varun desk
 				0, 10000000, 0, 0, 0, 0, //up
 				0, 0, 0, 0, 0, 0, //out toward workshop
@@ -452,7 +494,7 @@ int main(int argc, char** argv)
 				0, 0, 500, 0, 0, 0,
 				0, 0, 0, 500, 0, 0,
 				0, 0, 0, 0, 500, 0,
-				0, 0, 0, 0, 0, 500;
+				0, 0, 0, 0, 0, 500;*/
 			MatrixXd damping(6, 6); damping << 0, 0, 0, 0, 0, 0,
 				0, 100000, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 0,
@@ -464,7 +506,7 @@ int main(int argc, char** argv)
 				0, 0, 1, 0, 0, 0,
 				0, 0, 0, 100, 0, 0,
 				0, 0, 0, 0, 100, 0,
-				0, 0, 0, 0, 0, 100;
+				0, 0, 0, 0, 0, 100;*/
 			MatrixXd inertia(6, 6); inertia << 1000, 0, 0, 0, 0, 0,
 				0, 1, 0, 0, 0, 0,
 				0, 0, 1000, 0, 0, 0,
@@ -475,10 +517,10 @@ int main(int argc, char** argv)
 			MatrixXd torques(6, 1); torques << ETorque[0], ETorque[1], ETorque[2], ETorque[3], ETorque[4], ETorque[5];
 
 			t_e << al*torques + (1 - al)*torques_0;
-			torques_0 << t_e;*/
+			torques_0 << t_e;
 
 			//**************************--------------------
-			/*// Don't know
+			// Don't know
 			if (firstIt == 0)//first time inside
 			{
 				firstIt = 1;
@@ -488,11 +530,11 @@ int main(int argc, char** argv)
 
 				t_0 << -0.0313991, -0.414115, -0.00613078, -0.450773, 0.265899, -0.0418674;
 			}
-			//**********************------------------------*/
+			//**********************------------------------
 
 			//*********************-------------------------
 			//??
-			/*ftx = (double)data[0] / 1000000 - zerox; //toward varun desk
+			ftx = (double)data[0] / 1000000 - zerox; //toward varun desk
 			ftx_un = (double)data[0] / 1000000 - zerox;
 
 			fty = (double)data[1] / 1000000 - zeroy;
@@ -507,14 +549,14 @@ int main(int argc, char** argv)
 			ww = ww + 1;
 			force << ftx,0,fty,0,0,0;
 			//force << 0, 0, 0, 0, 0, 0;
-			//force << 2, 0, 2, 0, 0, 0;  // This force is for evaluting damping*/
+			//force << 2, 0, 2, 0, 0, 0;  // This force is for evaluting damping
 			steady = steady + 1;
 			//std::cout << ftx << std::endl;
 
 			perturb_flag = 0;
 
 			//**********************---------------------------
-/*
+
 			//?? what is the usage of q_0
 			q_0 << MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5];
 
@@ -528,17 +570,7 @@ int main(int argc, char** argv)
 			}
 
 			FK_x0 = FK_x;
-			
-*/
 
-			if (firstIt == 0)//first time inside
-			{
-				firstIt = 1;
-				//random_num=rand() % 4 + 1;
-				random_num=3;
-			}
-			
-			
 			if (cc == 1)
 			{
 				if (trigger == 1)
@@ -559,7 +591,7 @@ int main(int argc, char** argv)
 
 					while (exit_ran == 0)
 					{
-						//random_num=randnum(j1);
+						random_num=randnum(j1);
 						std::cout << "random_num = " << std::endl;
 						std::cout << random_num << std::endl;
 						//random_num = 4;
@@ -642,15 +674,40 @@ int main(int argc, char** argv)
 						perturb_flag = 7;
 						if (w == dur)
 						{
-							cc = 0;
+							rr = 4;
+							w = 1;
 						}
+					}
+
+					if (rr == 4)
+					{
+						x_incr << -(mag - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0))), 0, 0, 0, 0, 0;
+						if (w == dur)
+						{
+							rr = 5;
+							w = 1;
+						}
+					}
+
+					if (rr == 5)
+					{
+						x_incr << 0, 0, 0, 0, 0, 0;
+						if (w == 1)
+						{
+							//rr=4;
+							//w=0;
+							trig_stat = 1;
+						}
+
 					}
 				
 					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
 					delta_q << delta_q + qc;
 					q_new << q_freeze + delta_q;
 					x_incr_0 << x_incr;
-					
+					random_num2=rand() % 2 + 1;
+					std::cout << "random_num2 = " << std::endl;
+					std::cout << random_num2 << std::endl;
 				}
 				// next number----------------------------------
 				if (random_num == 2)
@@ -672,8 +729,31 @@ int main(int argc, char** argv)
 						perturb_flag = 7;
 						if (w == dur)
 						{
-						  cc = 0;
+							rr = 4;
+							w = 1;
 						}
+					}
+
+					if (rr == 4)
+					{
+						x_incr << (mag - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0))), 0, 0, 0, 0, 0;
+						if (w == dur)
+						{
+							rr = 5;
+							w = 1;
+						}
+					}
+
+					if (rr == 5)
+					{
+						x_incr << 0, 0, 0, 0, 0, 0;
+						if (w == 1)
+						{
+							//rr=4;
+							//w=0;
+							trig_stat = 1;
+						}
+
 					}
 
 					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
@@ -703,8 +783,31 @@ int main(int argc, char** argv)
 						perturb_flag = 7;
 						if (w == dur)
 						{
-							cc = 0;
+							rr = 4;
+							w = 1;
 						}
+					}
+
+					if (rr == 4)
+					{
+						x_incr << 0, 0, (mag - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0))), 0, 0, 0;
+						if (w == dur)
+						{
+							rr = 5;
+							w = 1;
+						}
+					}
+
+					if (rr == 5)
+					{
+						x_incr << 0, 0, 0, 0, 0, 0;
+						if (w == 1)
+						{
+							//rr=4;
+							//w=0;
+							trig_stat = 1;
+						}
+
 					}
 
 					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
@@ -734,8 +837,31 @@ int main(int argc, char** argv)
 						perturb_flag = 7;
 						if (w == dur)
 						{
-							cc = 0;
+							rr = 4;
+							w = 1;
 						}
+					}
+
+					if (rr == 4)
+					{
+						x_incr << 0, 0, -(mag - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0))), 0, 0, 0;
+						if (w == dur)
+						{
+							rr = 5;
+							w = 1;
+						}
+					}
+
+					if (rr == 5)
+					{
+						x_incr << 0, 0, 0, 0, 0, 0;
+						if (w == 1)
+						{
+							//rr=4;
+							//w=0;
+							trig_stat = 1;
+						}
+
 					}
 
 					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
@@ -745,6 +871,13 @@ int main(int argc, char** argv)
 	
 				}
 
+				/*if (random_num == 5 || random_num == 6 || random_num == 7 || random_num == 8)
+				{
+					x_00 << x_0;
+					x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
+					q_new << Ja.inverse()*(inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + q_0;//+(q_old-q_0)*0.3;
+					trig_stat = 1;
+				}*/
 				w = w + 1;
 				w2 = w;
 			}
@@ -752,7 +885,7 @@ int main(int argc, char** argv)
 
 			//***********************************************
 			// dono!!
-			/*if (trig_stat == 1)
+			if (trig_stat == 1)
 			{
 				x_incr_0 << 0, 0, 0, 0, 0, 0;
 				delta_q << 0, 0, 0, 0, 0, 0;
@@ -769,18 +902,17 @@ int main(int argc, char** argv)
 			if (j1 >= 12)
 			{
 				exit_ran = 1;
-				cc = 0;
-				/*q_new(0) = -1.779862;
+				q_new(0) = -1.779862;
 				q_new(1) = 0.821814;
 				q_new(2) = -0.067855;
 				q_new(3) = 1.302481;
 				q_new(4) = 0.284275;
 				q_new(5) = -1.118251;
-			}*/
+			}
 
 			if (steady < 2000)
 			{
-				/*delay_gate = 0;
+				delay_gate = 0;
 				ww = 0;
 				force << 0, 0, 0, 0, 0, 0;
 				zerox = 100 * al*(double)data[0] / 1000000 + (1 - 100 * al)*zerox;
@@ -789,7 +921,7 @@ int main(int argc, char** argv)
 				x_00 << x_0;
 				x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
 
-				x_new << (inertia / 0.00001 + damping / 0.001 + stiffness).inverse()*(force + inertia*(x_0 - x_00) / 0.00001 + stiffness*(x_e - x_0)) + x_0;*/
+				x_new << (inertia / 0.00001 + damping / 0.001 + stiffness).inverse()*(force + inertia*(x_0 - x_00) / 0.00001 + stiffness*(x_e - x_0)) + x_0;
 				q_new(0) = -1.779862;
 				q_new(1) = 0.821814;
 				q_new(2) = -0.067855;
@@ -806,7 +938,7 @@ int main(int argc, char** argv)
 				met = 0;
 			}
 
-			if (steady == 2500)
+			if (steady > 2500)
 			{
 				cc = 1;
 			}
@@ -849,7 +981,7 @@ int main(int argc, char** argv)
 			}
 			else
 			{
-				/*x_00 << x_0;
+				x_00 << x_0;
 				x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
 
 				x_new << (inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + x_0;
@@ -876,7 +1008,7 @@ int main(int argc, char** argv)
 					outerdelay = 0;
 
 				}
-				outerdelay = outerdelay + 1;*/
+				outerdelay = outerdelay + 1;
 
 				client.NextJoint[0] = q_new(0);
 				client.NextJoint[1] = q_new(1);

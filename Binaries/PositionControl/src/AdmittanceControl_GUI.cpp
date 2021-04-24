@@ -1,18 +1,21 @@
+#include <PositionControlClient.h>
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+#include <UdpServer/UdpServer.h>
+
+#include <Eigen/Dense>
 
 #include <sys/time.h>
+#include <unistd.h>
+#include <sys/shm.h>
+
 #include <iostream>
 #include <cmath>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <string.h> // strstr
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
-#include <time.h>
-#include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
+#include <cstdlib>
+#include <cstdio>
+#include <cmath>
+#include <cstring>
+#include <ctime>
 
 using namespace std;
 using namespace KUKA::FRI;
@@ -29,9 +32,15 @@ int *MakeFloatSharedMemory(int HowBig);
 float *MakeFloatSharedMemory2(int HowBig2);
 
 
+
 // Main
 int main(int argc, char** argv)
 {
+	// UDP Server address and port hardcoded now -- change later
+	std::string udp_addr("192.168.0.103");
+	int udp_port = 50000;
+	UDPServer udp_server(udp_addr, udp_port);
+
 	//******************---------------------------------------
 	//---------------------------------------
 	// May be changed-------------
@@ -44,7 +53,7 @@ int main(int argc, char** argv)
 	double velocity_mean = 0;
 	double error_delta = 0;
 	double checkval = 0;
-	double mag = 0.01;
+	double mag = 0.5; //previous magnitude for force
 	double dur = 1000;
 	int trig_stat = 0;
 	int outerdelay = 1;
@@ -58,6 +67,7 @@ int main(int argc, char** argv)
 	double zeroy = 0;
 	double x_disp;
 	double y_disp;
+	double xy_coord[2];
 	double ftx_0 = 0.0;
 	double fty_0 = 0.0;
 	int *data;	//pointer to shared memory
@@ -66,7 +76,7 @@ int main(int argc, char** argv)
 	data2 = MakeFloatSharedMemory2(2);
 	int c = 0;
 	int cc = 0;
-	double al = 0.0005;
+	double al = 0.5;
 	double al2 = 0.1;
 	int firstIt = 0;
 	int trigger = 1;
@@ -119,6 +129,7 @@ int main(int argc, char** argv)
 	//---------------------------------------
 	// May be changed-------------
 	MatrixXd x_0(6, 1); x_0 << 0, 0, 0, 0, 0, 0;
+	MatrixXd x_test(6, 1); x_test << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_00(6, 1); x_00 << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_incr(6, 1); x_incr << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_incr_0(6, 1); x_incr_0 << 0, 0, 0, 0, 0, 0;
@@ -136,6 +147,9 @@ int main(int argc, char** argv)
 	MatrixXd q_new(6, 1); q_new << 0, 0, 0, 0, 0, 0;
 	MatrixXd q_delay(6, 1); q_delay << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_new(6, 1); x_new << 0, 0, 0, 0, 0, 0;
+	MatrixXd v(6, 1); v << 0, 0, 0, 0, 0, 0;
+	MatrixXd acc(6, 1); acc << 0, 0, 0, 0, 0, 0;
+	MatrixXd Fnew(6, 1); Fnew << 0, 0, 0, 0, 0, 0;
 	MatrixXd q_old(6, 1); q_old << 0, 0, 0, 0, 0, 0;
 	MatrixXd test0(6, 6); test0 << 1, 0, 0, 0, 0, 0,
 		0, 1, 0, 0, 0, 0,
@@ -143,15 +157,23 @@ int main(int argc, char** argv)
 		0, 0, 0, 2, 0, 0,
 		0, 0, 0, 0, 2, 0,
 		0, 0, 0, 0, 0, 2;
-	
+
+	/////////////////
+	MatrixXd x_new2(6, 1); x_new2 << 0, 0, 0, 0, 0, 0;
+	MatrixXd Fnew2(6, 1); Fnew2 << 0, 0, 0, 0, 0, 0;
+	MatrixXd x_02(6, 1); x_02 << 0, 0, 0, 0, 0, 0;
+	MatrixXd x_002(6, 1); x_002 << 0, 0, 0, 0, 0, 0;
+	MatrixXd x_03(6, 1); x_03 << 0, 0, 0, 0, 0, 0;
+	MatrixXd x_003(6, 1); x_003 << 0, 0, 0, 0, 0, 0;
+	MatrixXd x_new3(6, 1); x_new3 << 0, 0, 0, 0, 0, 0;
+	/////////////////
+
 	//-------------------------------------------------
 	//*****************************--------------------------
 
 
 
 	//******************---------------------------------
-	// I don't know what it is
-	//filter
 	int sample = 200;
 	int sample2 = 100;
 	MatrixXd tdata(6, sample); tdata.setZero(6, sample);
@@ -160,19 +182,7 @@ int main(int argc, char** argv)
 
 	//*********************-----------------------------------
 	// First angles of Kuka
-	// not sure about the usage
 	MatrixXd qdata(6, sample); qdata.setZero(6, sample);//Initializing joint angles
-
-	for (int i = 0; i<sample; i++)
-	{
-		qdata(0, i) = -1.779862; //UPRIGHT
-		qdata(1, i) = 0.821814;
-		qdata(2, i) = -0.067855;
-		qdata(3, i) = 1.302481;
-		qdata(4, i) = 0.284275;
-		qdata(5, i) = -1.118251;
-	}
-	//*********************-------------------------------------
 
 	//************************----------------------------
 	// May be changed
@@ -193,7 +203,7 @@ int main(int argc, char** argv)
 	//*********************------------------------------
 
 	// parse command line arguments
-	if (argc < 2)
+	if (argc < 1)
 	{
 		printf(
 			"\nKUKA LBR Position Control application\n\n"
@@ -210,7 +220,6 @@ int main(int argc, char** argv)
 	int port = (argc >= 4) ? atoi(argv[3]) : DEFAULT_PORTID; //optional comand line argument for port
 	char path[4096];
 
-	FILE *InputFile; // Probably should be commented
 	FILE *OutputFile;
 	FILE *fp;
 
@@ -252,7 +261,7 @@ int main(int argc, char** argv)
 
 	// create new joint position client
 	PositionControlClient client;
-	client.intvalues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
+	client.InitValues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
 
 
 
@@ -272,37 +281,26 @@ int main(int argc, char** argv)
 
 	//create file for output
 	OutputFile = NewDataFile();
-	
-	//open trajectory file
-	InputFile = fopen(filename, "r"); 
-
-	//get the first value in the file. This should be the number of rows(or the number of joint commands)
-	success2 = fscanf(InputFile, "%d", &rows);
-	//cout<<rows<<endl;
-	if (rows<4)
-	{
-		fprintf(stdout, "Number of Rows is %d\n Are you sure the file is in correct format?\n First number should be number of rows.  \nThen each row is 7 joint values in radians.\n", rows);
-		return 1;
-	} // probably should be commented
-	if (!success2)
-	{
-		fprintf(stdout, "Error in reading file!\n");
-		return 1;
-	}
 
 
-	//read in first 7 joint positions (these should be in radians)
-	success2 = fscanf(InputFile, "%lf %lf %lf %lf %lf %lf %lf", &client.NextJoint[0], &client.NextJoint[1], &client.NextJoint[2], &client.NextJoint[3], &client.NextJoint[4], &client.NextJoint[5], &client.NextJoint[6]);
+	/*client.NextJoint[0] = -1.779862;
+	client.NextJoint[1] = 0.821814;
+	client.NextJoint[2] = -0.067855;
+	client.NextJoint[3] = 1.302481;
+	client.NextJoint[4] = 0.284275;
+	client.NextJoint[5] = -1.118251;
+	client.NextJoint[6] = -0.958709;*/
+
+	client.NextJoint[0] = -1.5708;
+	client.NextJoint[1] = 1.5708;
+	client.NextJoint[2] = 0;
+	client.NextJoint[3] = 1.5708;
+	client.NextJoint[4] = 0;
+	client.NextJoint[5] = -1.5708;
+	client.NextJoint[6] = -0.958709;
+
+
 	memcpy(client.LastJoint, client.NextJoint, 7 * sizeof(double));
-	
-	if (!success2)
-	{
-	fprintf(stdout,"Error in reading file!\n");
-	return 1;
-	}	 // Probably should be commented
-
-	//*****************************---------------------------------------------------------------
-
 
 	//*******************************---------------------------------------
 	// I don't understand them
@@ -338,7 +336,7 @@ int main(int argc, char** argv)
 			memcpy(MJoint, client.GetMeasJoint(), sizeof(double) * 7); //gets the most recent measured joint value
 			memcpy(ETorque, client.GetExtTor(), sizeof(double) * 7);//gets the external torques at the robot joints (supposedly subtracts the torques caused by the robot)
 
-		// Forward Kinematic
+			// Forward Kinematic
 			theta << MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6];
 
 			MatrixXd A1(4, 4); A1 << cos(theta(0, 0)), -sin(theta(0, 0))*cos(alpha(0, 0)), sin(theta(0, 0))*sin(alpha(0, 0)), a(0, 0)*cos(theta(0, 0)),
@@ -367,18 +365,16 @@ int main(int argc, char** argv)
 				0, 0, 0, 1;
 
 			MatrixXd T01(4, 4); T01 << A1;
-			MatrixXd T02(4, 4); T02 << A1*A2;
-			MatrixXd T03(4, 4); T03 << A1*A2*A3;
-			MatrixXd T04(4, 4); T04 << A1*A2*A3*A4;
-			MatrixXd T05(4, 4); T05 << A1*A2*A3*A4*A5;
-			MatrixXd T06(4, 4); T06 << A1*A2*A3*A4*A5*A6;
+			MatrixXd T02(4, 4); T02 << T01*A2;
+			MatrixXd T03(4, 4); T03 << T02*A3;
+			MatrixXd T04(4, 4); T04 << T03*A4;
+			MatrixXd T05(4, 4); T05 << T04*A5;
+			MatrixXd T06(4, 4); T06 << T05*A6;
 
 
 			//*******************--------------------------
 			// I don't know what are these for?
 			FK_x = T06(2, 3);
-
-
 
 			x_disp = T06(0, 3);
 			data2[0] = x_disp;
@@ -437,7 +433,7 @@ int main(int argc, char** argv)
 			MatrixXd Jg(6, 6); Jg << J1, J2, J3, J4, J5, J6;
 
 			//***********
-			// I should check the definition in notes
+
 			MatrixXd Tphi(6, 6); Tphi << 1, 0, 0, 0, 0, 0,
 				0, 1, 0, 0, 0, 0,
 				0, 0, 1, 0, 0, 0,
@@ -451,40 +447,38 @@ int main(int argc, char** argv)
 
 			// Initializing Stiffness Damping and Inertia
 
-			MatrixXd stiffness(6, 6); stiffness << 10000, 0, 0, 0, 0, 0, //toward varun desk
+			MatrixXd stiffness(6, 6); stiffness << 0, 0, 0, 0, 0, 0, //toward varun desk
 				0, 10000000, 0, 0, 0, 0, //up
 				0, 0, 0, 0, 0, 0, //out toward workshop
 				0, 0, 0, 1000000, 0, 0,
 				0, 0, 0, 0, 1000000, 0,
 				0, 0, 0, 0, 0, 1000000;
-			MatrixXd damping(6, 6); damping << 100000, 0, 0, 0, 0, 0,
-				0, 100000, 0, 0, 0, 0,
-				0, 0, 500, 0, 0, 0,
-				0, 0, 0, 500, 0, 0,
-				0, 0, 0, 0, 500, 0,
-				0, 0, 0, 0, 0, 500;
-			MatrixXd inertia(6, 6); inertia << 1, 0, 0, 0, 0, 0,
-				0, 1, 0, 0, 0, 0,
-				0, 0, 1, 0, 0, 0,
-				0, 0, 0, 100, 0, 0,
-				0, 0, 0, 0, 100, 0,
-				0, 0, 0, 0, 0, 100;
 
-			MatrixXd torques(6, 1); torques << ETorque[0], ETorque[1], ETorque[2], ETorque[3], ETorque[4], ETorque[5];
+			MatrixXd damping(6, 6); damping << 30, 0, 0, 0, 0, 0,
+				0, 100, 0, 0, 0, 0,
+				0, 0, 30, 0, 0, 0,
+				0, 0, 0, 0.5, 0, 0,
+				0, 0, 0, 0, 0.5, 0,
+				0, 0, 0, 0, 0, 0.5;
 
-			t_e << al*torques + (1 - al)*torques_0;
-			torques_0 << t_e;
+			MatrixXd inertia(6, 6); inertia << 7, 0, 0, 0, 0, 0,
+				0, 0.000001, 0, 0, 0, 0,
+				0, 0, 10, 0, 0, 0,
+				0, 0, 0, 0.0001, 0, 0,
+				0, 0, 0, 0, 0.0001, 0,
+				0, 0, 0, 0, 0, 0.0001;
+
 
 			//**************************--------------------
-			// Don't know
 			if (firstIt == 0)//first time inside
 			{
 				firstIt = 1;
 				std::cout << firstIt << std::endl;
 
 				x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
-
-				t_0 << -0.0313991, -0.414115, -0.00613078, -0.450773, 0.265899, -0.0418674;
+				x_03 << x_e;
+				x_003 << x_e;
+				x_new << x_e;
 			}
 			//**********************------------------------
 
@@ -501,490 +495,96 @@ int main(int argc, char** argv)
 			fty = al*fty + (1 - al)*fty_0;
 			fty_0 = fty;
 
-			//force << 3.0*sin(M_PI*ww/500),0,3.0*sin(M_PI*ww/500),0,0,0;
-			ww = ww + 1;
-			//force << ftx,0,fty,0,0,0;
-			force << 0, 0, 0, 0, 0, 0;
+			force << ftx,0,fty,0,0,0;
+
 			steady = steady + 1;
-			//std::cout << ftx << std::endl;
 
 			perturb_flag = 0;
 
 			//**********************---------------------------
 
-			//?? what is the usage of q_0
-			q_0 << MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5];
-
-			//**********************
-			//?? dono at all
-			delay_gate = delay_gate + 1;
-			if ((FK_x < gate1) && (FK_x0 > gate1) && (cc == 0) && (delay_gate > 2000))//first time inside
-			{
-				cc = 1;
-				exit_ran = 0;
-			}
-
-			FK_x0 = FK_x;
-
-			if (cc == 1)
-			{
-				if (trigger == 1)
-				{
-					trigger = 0;
-					fty_freeze = fty;
-					T06_freeze_x = T06(0, 3);
-					T06_freeze_y = T06(1, 3);
-					T06_freeze_z = T06(2, 3);
-					phi_euler_freeze = phi_euler;
-					theta_euler_freeze = theta_euler;
-					psi_euler_freeze = psi_euler;
-					q_freeze << q_new;
-
-					//**********************************************************************
-					//**********************************************************************
-					// Probably should be removed (related to position control)
-
-					while (exit_ran == 0)
-					{
-						//random_num=rand() % 2 + 1;
-						random_num = 4;
-						if (random_num == 1 && count_ran1 < 10)
-						{
-							perturb_flag = 1;
-							count_ran1 = count_ran1 + 1;
-							std::cout << "case1 = " << std::endl;
-							std::cout << count_ran1 << std::endl;
-							velocity_2 = velocity_mean;
-							std::cout << velocity_2 << std::endl;
-							exit_ran = 1;
-							perturb_count = perturb_count + 1;
-						}
-						if (random_num == 2 && count_ran2 < 10)
-						{
-							perturb_flag = 2;
-							count_ran2 = count_ran2 + 1;
-							std::cout << "case2 = " << std::endl;
-							std::cout << count_ran2 << std::endl;
-							velocity_2 = velocity_mean;
-							exit_ran = 1;
-							perturb_count = perturb_count + 1;
-
-						}std::cout << velocity_2 << std::endl;
-						if (random_num == 3 && count_ran3 < 10)
-						{
-							perturb_flag = 3;
-							count_ran3 = count_ran3 + 1;
-							std::cout << "case3 = " << std::endl;
-							std::cout << count_ran3 << std::endl;
-							velocity_2 = velocity_mean;
-							exit_ran = 1;
-							perturb_count = perturb_count + 1;
-						}
-						if (random_num == 4 && count_ran4 < 10)
-						{
-							perturb_flag = 4;
-							count_ran4 = count_ran4 + 1;
-							std::cout << "case4 = " << std::endl;
-							std::cout << count_ran4 << std::endl;
-							velocity_2 = velocity_mean;
-							exit_ran = 1;
-							perturb_count = perturb_count + 1;
-
-						}
-
-						if (random_num == 5 && count_ran_null < 10 || random_num == 6 && count_ran_null < 40 || random_num == 7 && count_ran_null < 40 || random_num == 8 && count_ran_null < 40)
-						{
-							perturb_flag = 5;
-							count_ran_null = count_ran_null + 1;
-							std::cout << "case null = " << std::endl;
-							std::cout << count_ran_null << std::endl;
-							exit_ran = 1;
-							perturb_count = perturb_count + 1;
-						}
-						std::cout << "Perturbation number = " << std::endl;
-						std::cout << perturb_count << std::endl;
-					}
-				}
-
-				if (random_num == 1)
-				{
-					if (rr == 1)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 2;
-							w = 1;
-						}
-					}
-
-					if (rr == 2)
-					{
-						vel_depend = velocity_2*w / dur;
-						x_incr << 0, 0, -vel_depend + mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
-						perturb_flag = 7;
-						checkval = x_incr(2) - x_incr_0(2);
-						if (w == dur)
-						{
-							rr = 3;
-							w = 1;
-						}
-					}
-
-					if (rr == 3)
-					{
-						x_incr << 0, 0, -velocity_2 + mag*(10.0*pow(1, 3.0) - 15.0*pow(1, 4.0) + 6.0*pow(1, 5.0)) - velocity_2*w / dur, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 4;
-							w = 1;
-						}
-					}
-
-
-					if (rr == 4)
-					{
-						x_incr << 0, 0, mag - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 5;
-							w = 1;
-						}
-
-					}
-
-					if (rr == 5)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							//rr=4;
-							//w=0;
-							trig_stat = 1;
-						}
-
-					}
-
-					qc << Ja.inverse()*(x_incr - x_incr_0);
-					delta_q << delta_q + qc;
-
-					q_new << q_freeze + delta_q;
-					x_incr_0 << x_incr;
-				}
-
-				// Next random number----------------------------
-				if (random_num == 2)
-				{
-					if (rr == 1)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 2;
-							w = 1;
-						}
-					}
-
-					if (rr == 2)
-					{
-						vel_depend = velocity_2*w / dur;
-						x_incr << 0, 0, -vel_depend - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
-						perturb_flag = 7;
-						if (w == dur)
-						{
-							rr = 3;
-							w = 1;
-						}
-					}
-
-					if (rr == 3)
-					{
-						x_incr << 0, 0, -velocity_2 - mag*(10.0*pow(1, 3.0) - 15.0*pow(1, 4.0) + 6.0*pow(1, 5.0)) - velocity_2*w / dur, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 4;
-							w = 1;
-						}
-					}
-
-					if (rr == 4)
-					{
-						x_incr << 0, 0, -(mag - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0))), 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 5;
-							w = 1;
-						}
-					}
-
-					if (rr == 5)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							//rr=4;
-							//w=0;
-							trig_stat = 1;
-						}
-
-					}
-
-					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
-					delta_q << delta_q + qc;
-					q_new << q_freeze + delta_q;
-					x_incr_0 << x_incr;
-				}
-
-				// Next random number----------------------------
-				if (random_num == 3)
-				{
-					if (rr == 1)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 2;
-							w = 1;
-						}
-					}
-
-					if (rr == 2)
-					{
-						vel_depend = velocity_2*w / dur;
-						x_incr << mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, -vel_depend, 0, 0, 0;
-						perturb_flag = 7;
-						if (w == dur)
-						{
-							rr = 3;
-							w = 1;
-						}
-					}
-
-					if (rr == 3)
-					{
-						x_incr << mag*(10.0*pow(1, 3.0) - 15.0*pow(1, 4.0) + 6.0*pow(1, 5.0)), 0, -velocity_2 - velocity_2*w / dur, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 4;
-							w = 1;
-						}
-					}
-
-					if (rr == 4)
-					{
-						x_incr << mag - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 5;
-							w = 1;
-						}
-					}
-
-					if (rr == 5)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							//rr=4;
-							//w=0;
-							trig_stat = 1;
-						}
-
-					}
-
-					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
-					delta_q << delta_q + qc;
-					q_new << q_freeze + delta_q;
-					x_incr_0 << x_incr;
-				}
-
-				// Next random number----------------------------
-				if (random_num == 4)
-				{
-					if (rr == 1)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 2;
-							w = 1;
-						}
-					}
-
-					if (rr == 2)
-					{
-						vel_depend = velocity_2*w / dur;
-						x_incr << -mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0, 0, 0;
-						perturb_flag = 7;
-						if (w == dur)
-						{
-							rr = 4;
-							w = 1;
-						}
-					}
-
-					if (rr == 3)
-					{
-						x_incr << -mag*(10.0*pow(1, 3.0) - 15.0*pow(1, 4.0) + 6.0*pow(1, 5.0)), 0, -velocity_2 - velocity_2*w / dur, 0, 0, 0;
-						if (w == 1)
-						{
-							rr = 4;
-							w = 1;
-						}
-					}
-
-					if (rr == 4)
-					{
-						x_incr << -(mag - mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0))), 0, 0, 0, 0, 0;
-						if (w == dur)
-						{
-							rr = 2;
-							w = 1;
-						}
-					}
-
-					if (rr == 5)
-					{
-						x_incr << 0, 0, 0, 0, 0, 0;
-						if (w == 1)
-						{
-							//rr=4;
-							//w=0;
-							trig_stat = 1;
-						}
-
-					}
-
-					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
-					delta_q << delta_q + qc;
-					q_new << q_freeze + delta_q;
-					x_incr_0 << x_incr;
-				}
-
-				if (random_num == 5 || random_num == 6 || random_num == 7 || random_num == 8)
-				{
-					x_00 << x_0;
-					x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
-					q_new << Ja.inverse()*(inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + q_0;//+(q_old-q_0)*0.3;
-					trig_stat = 1;
-				}
-				w = w + 1;
-				w2 = w;
-			}
-			//***********************************************
-
-			//***********************************************
-			// dono!!
-			if (trig_stat == 1)
-			{
-				x_incr_0 << 0, 0, 0, 0, 0, 0;
-				delta_q << 0, 0, 0, 0, 0, 0;
-				cc = 0;
-				w = 0;
-				trigger = 1;
-				delay_gate = 0;
-				rr = 1;
-				trig_stat = 0;
-			}
-
 			if (steady < 2000)
 			{
-				delay_gate = 0;
-				ww = 0;
-				force << 0, 0, 0, 0, 0, 0;
-				zerox = 100 * al*(double)data[0] / 1000000 + (1 - 100 * al)*zerox;
-				zeroy = 100 * al*(double)data[1] / 1000000 + (1 - 100 * al)*zeroy;
+			    force << 0, 0, 0, 0, 0, 0;
 
-				x_00 << x_0;
-				x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
+			    zerox = al*(double)data[0] / 1000000 + (1 - al)*zerox;
+			    zeroy = al*(double)data[1] / 1000000 + (1 - al)*zeroy;
 
-				x_new << (inertia / 0.00001 + damping / 0.001 + stiffness).inverse()*(force + inertia*(x_0 - x_00) / 0.00001 + stiffness*(x_e - x_0)) + x_0;
-			}
+			    /*q_new(0) = -1.779862;
+			    q_new(1) = 0.821814;
+			    q_new(2) = -0.067855;
+			    q_new(3) = 1.302481;
+			    q_new(4) = 0.284275;
+			    q_new(5) = -1.118251;*/
+			    q_new(0) = -1.5708;
+			    q_new(1) = 1.5708;
+			    q_new(2) = 0;
+			    q_new(3) = 1.5708;
+			    q_new(4) = 0;
+			    q_new(5) = -1.5708;
+			    q_freeze << q_new;
 
-			met = met + 1;
+			 }
 
-			if (met == 2000)
-			{
-				met = 0;
-			}
 
-			if (steady > 2500)
-			{
-				cc = 1;
-			}
 
 			stime = client.GetTimeStamp();
 
-			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %d %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], ftx_un, fty_un, perturb_flag, q_new(0), q_new(1), q_new(2), q_new(3), q_new(4), q_new(5));
 
-			if (c == 1)
+			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %d %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), perturb_flag, x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5));
+
+			// Use commanded x--------------------------------------------------------------------------
+			x_003 << x_03;
+			x_03 << x_new;
+			x_new << (inertia/(0.000001) + damping/(0.001) + stiffness).inverse()*(force + (inertia/(0.000001))*(x_03 - x_003) + stiffness*(x_e - x_03)) + x_03;
+
+				//------------------------------------------------------------------------------------------
+
+			if (steady > 2000)
 			{
-				count2++;
+			    if (x_new(2) >= 0.94)
+			    {
+			      x_new(2) = 0.94;
+			    }
 
-				if (count2 == 200 || !success) //was "rows" not 400
-				{
-					c = 0;
-					count2 = 0;
-					std::cout << c << std::endl;
-				}
-				else
-				{
-					//move comanded joint to last joint
-					memcpy(client.LastJoint, client.NextJoint, 7 * sizeof(double));
-					//read in next joint command
+			    if (x_new(2) <= 0.58)
+			    {
+			      x_new(2) = 0.58;
+			    }
 
-					success2 = fscanf(InputFile, "%lf %lf %lf %lf %lf %lf %lf", &client.NextJoint[0], &client.NextJoint[1], &client.NextJoint[2], &client.NextJoint[3], &client.NextJoint[4], &client.NextJoint[5], &client.NextJoint[6]);
-					//std::cout << client.NextJoint[0] << std::endl;
+			    if (x_new(0) >= 0.18)
+			    {
+			      x_new(0) = 0.18;
+			    }
 
-					success2 = fscanf(InputFile, "%lf %lf %lf %lf %lf %lf %lf", &MJoint[0], &MJoint[1], &MJoint[2], &MJoint[3], &MJoint[4], &MJoint[5], &MJoint[6]);
-
-					if (!success2)
-					{
-						fprintf(stdout, "Error in reading file!\n");
-						fclose(OutputFile);
-						return 1;
-					}
-
-				}
+			    if (x_new(0) <= -0.18)
+			    {
+			      x_new(0) = -0.18;
+			    }
 			}
-			else
+
+			if (0.58 <= x_new(2) & x_new(2) <= 0.94)
 			{
-				x_00 << x_0;
-				x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
-
-				x_new << (inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + x_0;
-
-				if (trigger == 1) //prevent new joints commands from being sent during position perturbation
-				{
-					if (0.21 < x_new(2) & x_new(2) < .51)
-					{
-						q_new << Ja.inverse()*(inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + q_0;//+(q_old-q_0)*0.3;
-																																					 // std::cout << q_new << std::endl;
-					}
-				}
-
-				q_old << q_new;
-
-				q_delay << Ja.inverse()*(inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + q_0;
-				if (outerdelay > 9)
-				{
-					outerdelay = 0;
-
-				}
-				outerdelay = outerdelay + 1;
-
-				/*client.NextJoint[0] = q_new(0);
-				client.NextJoint[1] = q_new(1);
-				client.NextJoint[2] = q_new(2);
-				client.NextJoint[3] = q_new(3);
-				client.NextJoint[4] = q_new(4);
-				client.NextJoint[5] = q_new(5);
-				client.NextJoint[6] = -0.7854;*/
-				
-				memcpy(client.LastJoint, client.NextJoint,7*sizeof(double));
-				success2 = fscanf(InputFile, "%lf %lf %lf %lf %lf %lf %lf", &client.NextJoint[0],&client.NextJoint[1],&client.NextJoint[2],&client.NextJoint[3],&client.NextJoint[4],&client.NextJoint[5],&client.NextJoint[6]);
-
+			    if (-0.18 <= x_new(0) & x_new(0) <= 0.18)
+			    {
+			      qc << Ja.inverse()*(x_new - x_03);
+			      delta_q << delta_q +qc;
+			      q_new << delta_q +q_freeze;
+			    }
 			}
+
+			client.NextJoint[0] = q_new(0);
+			client.NextJoint[1] = q_new(1);
+			client.NextJoint[2] = q_new(2);
+			client.NextJoint[3] = q_new(3);
+			client.NextJoint[4] = q_new(4);
+			client.NextJoint[5] = q_new(5);
+			client.NextJoint[6] = -0.958709;
+
+			// Send data to visualizer gui
+			xy_coord[0] = x_disp;
+			xy_coord[1] = y_disp;
+			udp_server.Send(xy_coord, 2);
 		}
 	}
 

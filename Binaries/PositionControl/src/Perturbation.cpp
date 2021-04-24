@@ -1,31 +1,22 @@
+
+#include <PositionControlClient.h>
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+
+#include <Eigen/Dense>
+
 #include <sys/time.h>
+#include <unistd.h>
+#include <sys/shm.h>
+
 #include <iostream>
 #include <cmath>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <string.h>
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
-#include <time.h>
-#include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
+#include <cstdlib>
+#include <cstdio>
+#include <cmath>
+#include <cstring>
+#include <ctime>
 
-// UDP Server Headers
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <string>
-#include <string.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 
 
 using namespace std;
@@ -43,129 +34,9 @@ int *MakeFloatSharedMemory(int HowBig);
 float *MakeFloatSharedMemory2(int HowBig2);
 
 
-class UDPServer{
-private:
-    // UDP/IP socket info
-	std::string _addr;
-	int _port;
-    int _sockfd;
-
-    // Server/Client address info
-	struct sockaddr_in _servaddr;
-	struct sockaddr_in _cliaddr;
-	socklen_t _cliaddrlen = sizeof(_cliaddr);
-
-    // Recv/send limit
-    const int _maxlen = 1024;
-
-    // Connection State
-    bool _connected = false;
-
-    // select(2) related data
-    fd_set _readset;
-    struct timeval _select_timeout = {.tv_sec = 0, .tv_usec = 0};
-
-public:
-    // Class Methods
-	UDPServer(std::string addr, int port);
-	std::string GetAddress();
-	int GetPort();
-	bool IsConnected() const;
-	void ConnectClient();
-    void ConnectIfNecessary();
-	template<typename T>
-	void Send(T* data, int ndata);
-};
-
-UDPServer::UDPServer(std::string addr, int port): _port(port), _addr(addr){
-
-	// Initialize socket
-	_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (_sockfd < 0){
-		perror("socket creation failed");
-		exit(EXIT_FAILURE);
-	}
-
-	// Reset and fill server address structs
-	memset(&_servaddr, 0, sizeof(_servaddr));
-	memset(&_cliaddr, 0, sizeof(_cliaddr));
-
-	_servaddr.sin_family = AF_INET;
-	inet_pton(AF_INET, _addr.c_str(), &_servaddr.sin_addr);
-	_servaddr.sin_port = htons(_port);
-
-	// Bind the socket with the server address
-	if (bind(_sockfd, (const struct sockaddr *)&_servaddr,sizeof(_servaddr)) < 0)
-	{
-		perror("bind failed");
-		exit(EXIT_FAILURE);
-	}
-}
-
-void UDPServer::ConnectIfNecessary(){
-    /*
-    select(2) system call monitors if there is an incoming messge from the client
-    If there is, select(2) will return a number greater than 0.  We will then connect
-    run ConnectClient() which reads in the message and gets the client's ip info
-    so the server can send messages to it
-    */
-    FD_ZERO(&_readset);
-    FD_SET(_sockfd, &_readset);
-    int ret = select(_sockfd+1, &_readset, NULL, NULL, &_select_timeout);
-    if (ret > 0){
-        ConnectClient();
-    }
-}
-
-std::string UDPServer::GetAddress(){
-    // return server's ip address
-	return _addr;
-}
-
-int UDPServer::GetPort(){
-    // return server's port
-	return _port;
-}
-
-bool UDPServer::IsConnected() const{
-    // return server-client connection status
-    return _connected;
-}
-
-void UDPServer::ConnectClient(){
-    /*
-    recvfrom() system call reads the message into the buffer and fills the _cliaddr
-    struct with the client's ip info.  The message in the buffer is not important.
-    We only do this so we get the client's ip address info
-    */
-	char buffer[_maxlen];
-	int n;
-	n = recvfrom(_sockfd, (char *)buffer, _maxlen,
-				MSG_WAITALL, ( struct sockaddr *) &_cliaddr, &_cliaddrlen);
-	_connected = true;
-}
-
-template<typename T>
-void UDPServer::Send(T* data, int ndata){
-    // Connect/Reconnect to client if necessary (get's clients ip address info)
-    ConnectIfNecessary();
-    // Send data if the server is connected to a client
-	if (_connected){
-		sendto(_sockfd, (const T *) data, sizeof(data)*ndata,
-  				 MSG_DONTWAIT, (const struct sockaddr *) &_cliaddr, _cliaddrlen);
-	}
-}
-
-
-
 // Main
 int main(int argc, char** argv)
 {
-	// UDP Server address and port hardcoded now -- change later
-	std::string udp_addr("192.168.0.103");
-	int udp_port = 50000;
-	UDPServer udp_server(udp_addr, udp_port);
-
 	//******************---------------------------------------
 	//---------------------------------------
 	// May be changed-------------
@@ -178,8 +49,9 @@ int main(int argc, char** argv)
 	double velocity_mean = 0;
 	double error_delta = 0;
 	double checkval = 0;
-	double mag = 0.5; //previous magnitude for force
-	double dur = 1000;
+	double mag = 0.04;
+	//double dur = 1000;
+	double dur = 300;
 	int trig_stat = 0;
 	int outerdelay = 1;
 	int delay_gate = 0;
@@ -192,7 +64,6 @@ int main(int argc, char** argv)
 	double zeroy = 0;
 	double x_disp;
 	double y_disp;
-	double xy_coord[2];
 	double ftx_0 = 0.0;
 	double fty_0 = 0.0;
 	int *data;	//pointer to shared memory
@@ -201,7 +72,7 @@ int main(int argc, char** argv)
 	data2 = MakeFloatSharedMemory2(2);
 	int c = 0;
 	int cc = 0;
-	double al = 0.5;
+	double al = 0.0005;
 	double al2 = 0.1;
 	int firstIt = 0;
 	int trigger = 1;
@@ -214,6 +85,7 @@ int main(int argc, char** argv)
 	double psi_euler_freeze;
 	int w = 0;
 	int random_num;
+	int random_num2;
 	int ww = 0;
 	double ft[2];
 	int steady = 0;
@@ -233,6 +105,7 @@ int main(int argc, char** argv)
 	int count_ran_null = 0;
 	int exit_ran = 0;
 	int perturb_count = 0;
+	int j1 = 0;
 
 	double phi_euler = 0;
 	double theta_euler = 0;
@@ -254,7 +127,6 @@ int main(int argc, char** argv)
 	//---------------------------------------
 	// May be changed-------------
 	MatrixXd x_0(6, 1); x_0 << 0, 0, 0, 0, 0, 0;
-	MatrixXd x_test(6, 1); x_test << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_00(6, 1); x_00 << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_incr(6, 1); x_incr << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_incr_0(6, 1); x_incr_0 << 0, 0, 0, 0, 0, 0;
@@ -273,8 +145,6 @@ int main(int argc, char** argv)
 	MatrixXd q_delay(6, 1); q_delay << 0, 0, 0, 0, 0, 0;
 	MatrixXd x_new(6, 1); x_new << 0, 0, 0, 0, 0, 0;
 	MatrixXd v(6, 1); v << 0, 0, 0, 0, 0, 0;
-	MatrixXd acc(6, 1); acc << 0, 0, 0, 0, 0, 0;
-	MatrixXd Fnew(6, 1); Fnew << 0, 0, 0, 0, 0, 0;
 	MatrixXd q_old(6, 1); q_old << 0, 0, 0, 0, 0, 0;
 	MatrixXd test0(6, 6); test0 << 1, 0, 0, 0, 0, 0,
 		0, 1, 0, 0, 0, 0,
@@ -282,23 +152,15 @@ int main(int argc, char** argv)
 		0, 0, 0, 2, 0, 0,
 		0, 0, 0, 0, 2, 0,
 		0, 0, 0, 0, 0, 2;
-
-	/////////////////
-	MatrixXd x_new2(6, 1); x_new2 << 0, 0, 0, 0, 0, 0;
-	MatrixXd Fnew2(6, 1); Fnew2 << 0, 0, 0, 0, 0, 0;
-	MatrixXd x_02(6, 1); x_02 << 0, 0, 0, 0, 0, 0;
-	MatrixXd x_002(6, 1); x_002 << 0, 0, 0, 0, 0, 0;
-	MatrixXd x_03(6, 1); x_03 << 0, 0, 0, 0, 0, 0;
-	MatrixXd x_003(6, 1); x_003 << 0, 0, 0, 0, 0, 0;
-	MatrixXd x_new3(6, 1); x_new3 << 0, 0, 0, 0, 0, 0;
-	/////////////////
-
+	MatrixXd randnum(12,1); randnum << 1, 2, 1, 3, 4, 2, 2, 4, 4, 3, 1, 3;
 	//-------------------------------------------------
 	//*****************************--------------------------
 
 
 
 	//******************---------------------------------
+	// I don't know what it is
+	//filter
 	int sample = 200;
 	int sample2 = 100;
 	MatrixXd tdata(6, sample); tdata.setZero(6, sample);
@@ -307,7 +169,19 @@ int main(int argc, char** argv)
 
 	//*********************-----------------------------------
 	// First angles of Kuka
+	// not sure about the usage
 	MatrixXd qdata(6, sample); qdata.setZero(6, sample);//Initializing joint angles
+
+	/*for (int i = 0; i<sample; i++)
+	{
+		qdata(0, i) = -1.779862; //UPRIGHT
+		qdata(1, i) = 0.821814;
+		qdata(2, i) = -0.067855;
+		qdata(3, i) = 1.302481;
+		qdata(4, i) = 0.284275;
+		qdata(5, i) = -1.118251;
+	}*/
+	//*********************-------------------------------------
 
 	//************************----------------------------
 	// May be changed
@@ -345,6 +219,7 @@ int main(int argc, char** argv)
 	int port = (argc >= 4) ? atoi(argv[3]) : DEFAULT_PORTID; //optional comand line argument for port
 	char path[4096];
 
+	//FILE *InputFile; // Probably should be commented
 	FILE *OutputFile;
 	FILE *fp;
 
@@ -386,7 +261,7 @@ int main(int argc, char** argv)
 
 	// create new joint position client
 	PositionControlClient client;
-	client.intvalues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
+	client.InitValues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
 
 
 
@@ -406,25 +281,16 @@ int main(int argc, char** argv)
 
 	//create file for output
 	OutputFile = NewDataFile();
-
-
-	/*client.NextJoint[0] = -1.779862;
+	
+	client.NextJoint[0] = -1.779862;
 	client.NextJoint[1] = 0.821814;
 	client.NextJoint[2] = -0.067855;
 	client.NextJoint[3] = 1.302481;
 	client.NextJoint[4] = 0.284275;
 	client.NextJoint[5] = -1.118251;
-	client.NextJoint[6] = -0.958709;*/
-
-	client.NextJoint[0] = -1.5708;
-	client.NextJoint[1] = 1.5708;
-	client.NextJoint[2] = 0;
-	client.NextJoint[3] = 1.5708;
-	client.NextJoint[4] = 0;
-	client.NextJoint[5] = -1.5708;
 	client.NextJoint[6] = -0.958709;
-
-
+	
+	
 	memcpy(client.LastJoint, client.NextJoint, 7 * sizeof(double));
 
 	//*******************************---------------------------------------
@@ -461,7 +327,7 @@ int main(int argc, char** argv)
 			memcpy(MJoint, client.GetMeasJoint(), sizeof(double) * 7); //gets the most recent measured joint value
 			memcpy(ETorque, client.GetExtTor(), sizeof(double) * 7);//gets the external torques at the robot joints (supposedly subtracts the torques caused by the robot)
 
-			// Forward Kinematic
+		// Forward Kinematic
 			theta << MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6];
 
 			MatrixXd A1(4, 4); A1 << cos(theta(0, 0)), -sin(theta(0, 0))*cos(alpha(0, 0)), sin(theta(0, 0))*sin(alpha(0, 0)), a(0, 0)*cos(theta(0, 0)),
@@ -490,16 +356,18 @@ int main(int argc, char** argv)
 				0, 0, 0, 1;
 
 			MatrixXd T01(4, 4); T01 << A1;
-			MatrixXd T02(4, 4); T02 << T01*A2;
-			MatrixXd T03(4, 4); T03 << T02*A3;
-			MatrixXd T04(4, 4); T04 << T03*A4;
-			MatrixXd T05(4, 4); T05 << T04*A5;
-			MatrixXd T06(4, 4); T06 << T05*A6;
+			MatrixXd T02(4, 4); T02 << A1*A2;
+			MatrixXd T03(4, 4); T03 << A1*A2*A3;
+			MatrixXd T04(4, 4); T04 << A1*A2*A3*A4;
+			MatrixXd T05(4, 4); T05 << A1*A2*A3*A4*A5;
+			MatrixXd T06(4, 4); T06 << A1*A2*A3*A4*A5*A6;
 
 
 			//*******************--------------------------
 			// I don't know what are these for?
 			FK_x = T06(2, 3);
+
+
 
 			x_disp = T06(0, 3);
 			data2[0] = x_disp;
@@ -558,7 +426,7 @@ int main(int argc, char** argv)
 			MatrixXd Jg(6, 6); Jg << J1, J2, J3, J4, J5, J6;
 
 			//***********
-
+			// I should check the definition in notes
 			MatrixXd Tphi(6, 6); Tphi << 1, 0, 0, 0, 0, 0,
 				0, 1, 0, 0, 0, 0,
 				0, 0, 1, 0, 0, 0,
@@ -569,47 +437,67 @@ int main(int argc, char** argv)
 			MatrixXd Ja(6, 6); Ja << Tphi.inverse()*Jg;
 
 			//*****************
-
+/*
 			// Initializing Stiffness Damping and Inertia
 
+			/*MatrixXd stiffness(6, 6); stiffness << 10000, 0, 0, 0, 0, 0, //toward varun desk
+				0, 10000000, 0, 0, 0, 0, //up
+				0, 0, 0, 0, 0, 0, //out toward workshop
+				0, 0, 0, 1000000, 0, 0,
+				0, 0, 0, 0, 1000000, 0,
+				0, 0, 0, 0, 0, 1000000;
 			MatrixXd stiffness(6, 6); stiffness << 0, 0, 0, 0, 0, 0, //toward varun desk
 				0, 10000000, 0, 0, 0, 0, //up
 				0, 0, 0, 0, 0, 0, //out toward workshop
 				0, 0, 0, 1000000, 0, 0,
 				0, 0, 0, 0, 1000000, 0,
 				0, 0, 0, 0, 0, 1000000;
+			/*MatrixXd damping(6, 6); damping << 100000, 0, 0, 0, 0, 0,
+				0, 100000, 0, 0, 0, 0,
+				0, 0, 500, 0, 0, 0,
+				0, 0, 0, 500, 0, 0,
+				0, 0, 0, 0, 500, 0,
+				0, 0, 0, 0, 0, 500;
+			MatrixXd damping(6, 6); damping << 0, 0, 0, 0, 0, 0,
+				0, 100000, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0,
+				0, 0, 0, 500, 0, 0,
+				0, 0, 0, 0, 500, 0,
+				0, 0, 0, 0, 0, 500;
+			/*MatrixXd inertia(6, 6); inertia << 1, 0, 0, 0, 0, 0,
+				0, 1, 0, 0, 0, 0,
+				0, 0, 1, 0, 0, 0,
+				0, 0, 0, 100, 0, 0,
+				0, 0, 0, 0, 100, 0,
+				0, 0, 0, 0, 0, 100;
+			MatrixXd inertia(6, 6); inertia << 1000, 0, 0, 0, 0, 0,
+				0, 1, 0, 0, 0, 0,
+				0, 0, 1000, 0, 0, 0,
+				0, 0, 0, 100, 0, 0,
+				0, 0, 0, 0, 100, 0,
+				0, 0, 0, 0, 0, 100;
 
-			MatrixXd damping(6, 6); damping << 30, 0, 0, 0, 0, 0,
-				0, 100, 0, 0, 0, 0,
-				0, 0, 30, 0, 0, 0,
-				0, 0, 0, 0.5, 0, 0,
-				0, 0, 0, 0, 0.5, 0,
-				0, 0, 0, 0, 0, 0.5;
+			MatrixXd torques(6, 1); torques << ETorque[0], ETorque[1], ETorque[2], ETorque[3], ETorque[4], ETorque[5];
 
-			MatrixXd inertia(6, 6); inertia << 7, 0, 0, 0, 0, 0,
-				0, 0.000001, 0, 0, 0, 0,
-				0, 0, 10, 0, 0, 0,
-				0, 0, 0, 0.0001, 0, 0,
-				0, 0, 0, 0, 0.0001, 0,
-				0, 0, 0, 0, 0, 0.0001;
-
+			t_e << al*torques + (1 - al)*torques_0;
+			torques_0 << t_e;*/
 
 			//**************************--------------------
+			/*// Don't know
 			if (firstIt == 0)//first time inside
 			{
 				firstIt = 1;
 				std::cout << firstIt << std::endl;
 
 				x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
-				x_03 << x_e;
-				x_003 << x_e;
-				x_new << x_e;
+
+				t_0 << -0.0313991, -0.414115, -0.00613078, -0.450773, 0.265899, -0.0418674;
 			}
-			//**********************------------------------
+			//**********************------------------------*/
 
 			//*********************-------------------------
 			//??
-			ftx = (double)data[0] / 1000000 - zerox; //toward varun desk
+			/*ftx = (double)data[0] / 1000000 - zerox; //toward varun desk
 			ftx_un = (double)data[0] / 1000000 - zerox;
 
 			fty = (double)data[1] / 1000000 - zeroy;
@@ -620,96 +508,411 @@ int main(int argc, char** argv)
 			fty = al*fty + (1 - al)*fty_0;
 			fty_0 = fty;
 
+			//force << 3.0*sin(M_PI*ww/500),0,3.0*sin(M_PI*ww/500),0,0,0;
+			ww = ww + 1;
 			force << ftx,0,fty,0,0,0;
-
+			//force << 0, 0, 0, 0, 0, 0;
+			//force << 2, 0, 2, 0, 0, 0;  // This force is for evaluting damping*/
 			steady = steady + 1;
+			//std::cout << ftx << std::endl;
 
 			perturb_flag = 0;
 
 			//**********************---------------------------
+/*
+			//?? what is the usage of q_0
+			q_0 << MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5];
+
+			//**********************
+			//?? dono at all
+			delay_gate = delay_gate + 1;
+			if ((FK_x < gate1) && (FK_x0 > gate1) && (cc == 0) && (delay_gate > 2000))//first time inside
+			{
+				cc = 1;
+				exit_ran = 0;
+			}
+
+			FK_x0 = FK_x;
+			
+*/
+
+			if (firstIt == 0)//first time inside
+			{
+				firstIt = 1;
+				//random_num=rand() % 4 + 1;
+				random_num=3;
+			}
+			
+			
+			if (cc == 1)
+			{
+				if (trigger == 1)
+				{
+					trigger = 0;
+					fty_freeze = fty;
+					T06_freeze_x = T06(0, 3);
+					T06_freeze_y = T06(1, 3);
+					T06_freeze_z = T06(2, 3);
+					phi_euler_freeze = phi_euler;
+					theta_euler_freeze = theta_euler;
+					psi_euler_freeze = psi_euler;
+					q_freeze << q_new;
+
+					//**********************************************************************
+					//**********************************************************************
+					// Probably should be removed (related to position control)
+
+					while (exit_ran == 0)
+					{
+						//random_num=randnum(j1);
+						std::cout << "random_num = " << std::endl;
+						std::cout << random_num << std::endl;
+						//random_num = 4;
+						if (random_num == 1 && count_ran1 < 10)
+						{
+							perturb_flag = 1;
+							count_ran1 = count_ran1 + 1;
+							std::cout << "case1 = " << std::endl;
+							std::cout << count_ran1 << std::endl;
+							velocity_2 = velocity_mean;
+							std::cout << velocity_2 << std::endl;
+							exit_ran = 1;
+							perturb_count = perturb_count + 1;
+						}
+						if (random_num == 2 && count_ran2 < 10)
+						{
+							perturb_flag = 2;
+							count_ran2 = count_ran2 + 1;
+							std::cout << "case2 = " << std::endl;
+							std::cout << count_ran2 << std::endl;
+							velocity_2 = velocity_mean;
+							exit_ran = 1;
+							perturb_count = perturb_count + 1;
+
+						}std::cout << velocity_2 << std::endl;
+						if (random_num == 3 && count_ran3 < 10)
+						{
+							perturb_flag = 3;
+							count_ran3 = count_ran3 + 1;
+							std::cout << "case3 = " << std::endl;
+							std::cout << count_ran3 << std::endl;
+							velocity_2 = velocity_mean;
+							exit_ran = 1;
+							perturb_count = perturb_count + 1;
+						}
+						if (random_num == 4 && count_ran4 < 10)
+						{
+							perturb_flag = 4;
+							count_ran4 = count_ran4 + 1;
+							std::cout << "case4 = " << std::endl;
+							std::cout << count_ran4 << std::endl;
+							velocity_2 = velocity_mean;
+							exit_ran = 1;
+							perturb_count = perturb_count + 1;
+
+						}
+
+						if (random_num == 5 && count_ran_null < 10 || random_num == 6 && count_ran_null < 40 || random_num == 7 && count_ran_null < 40 || random_num == 8 && count_ran_null < 40)
+						{
+							perturb_flag = 5;
+							count_ran_null = count_ran_null + 1;
+							std::cout << "case null = " << std::endl;
+							std::cout << count_ran_null << std::endl;
+							exit_ran = 1;
+							perturb_count = perturb_count + 1;
+						}
+						std::cout << "Perturbation number = " << std::endl;
+						std::cout << perturb_count << std::endl;
+					}
+				}
+
+
+				// Next random number----------------------------
+				if (random_num == 1)
+				{
+					if (rr == 1)
+					{
+						x_incr << 0, 0, 0, 0, 0, 0;
+						if (w == 1)
+						{
+							rr = 2;
+							w = 1;
+						}
+					}
+
+					if (rr == 2)
+					{
+						vel_depend = velocity_2*w / dur;
+						x_incr << -mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0, 0, 0;
+						perturb_flag = 7;
+						if (w == dur)
+						{
+							cc = 0;
+						}
+					}
+				
+					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
+					delta_q << delta_q + qc;
+					q_new << q_freeze + delta_q;
+					x_incr_0 << x_incr;
+					
+				}
+				// next number----------------------------------
+				if (random_num == 2)
+				{
+					if (rr == 1)
+					{
+						x_incr << 0, 0, 0, 0, 0, 0;
+						if (w == 1)
+						{
+							rr = 2;
+							w = 1;
+						}
+					}
+
+					if (rr == 2)
+					{
+						vel_depend = velocity_2*w / dur;
+						x_incr << mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0, 0, 0;
+						perturb_flag = 7;
+						if (w == dur)
+						{
+						  cc = 0;
+						}
+					}
+
+					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
+					delta_q << delta_q + qc;
+					q_new << q_freeze + delta_q;
+					x_incr_0 << x_incr;
+	
+				}
+				
+				// next number----------------------------------
+				if (random_num == 3)
+				{
+					if (rr == 1)
+					{
+						x_incr << 0, 0, 0, 0, 0, 0;
+						if (w == 1)
+						{
+							rr = 2;
+							w = 1;
+						}
+					}
+
+					if (rr == 2)
+					{
+						vel_depend = velocity_2*w / dur;
+						x_incr << 0, 0, mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
+						perturb_flag = 7;
+						if (w == dur)
+						{
+							cc = 0;
+						}
+					}
+
+					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
+					delta_q << delta_q + qc;
+					q_new << q_freeze + delta_q;
+					x_incr_0 << x_incr;
+	
+				}
+				
+				// next number----------------------------------
+				if (random_num == 4)
+				{
+					if (rr == 1)
+					{
+						x_incr << 0, 0, 0, 0, 0, 0;
+						if (w == 1)
+						{
+							rr = 2;
+							w = 1;
+						}
+					}
+
+					if (rr == 2)
+					{
+						vel_depend = velocity_2*w / dur;
+						x_incr << 0, 0, -mag*(10.0*pow(w / dur, 3.0) - 15.0*pow(w / dur, 4.0) + 6.0*pow(w / dur, 5.0)), 0, 0, 0;
+						perturb_flag = 7;
+						if (w == dur)
+						{
+							cc = 0;
+						}
+					}
+
+					qc << Ja.inverse()*(x_incr - x_incr_0);//+(q_old-q_0)*0.3;
+					delta_q << delta_q + qc;
+					q_new << q_freeze + delta_q;
+					x_incr_0 << x_incr;
+	
+				}
+
+				w = w + 1;
+				w2 = w;
+			}
+			//***********************************************
+
+			//***********************************************
+			// dono!!
+			/*if (trig_stat == 1)
+			{
+				x_incr_0 << 0, 0, 0, 0, 0, 0;
+				delta_q << 0, 0, 0, 0, 0, 0;
+				//cc = 0;
+				w = 0;
+				trigger = 1;
+				delay_gate = 0;
+				rr = 1;
+				trig_stat = 0;
+				exit_ran = 0;
+				j1++;
+			}
+			
+			if (j1 >= 12)
+			{
+				exit_ran = 1;
+				cc = 0;
+				/*q_new(0) = -1.779862;
+				q_new(1) = 0.821814;
+				q_new(2) = -0.067855;
+				q_new(3) = 1.302481;
+				q_new(4) = 0.284275;
+				q_new(5) = -1.118251;
+			}*/
 
 			if (steady < 2000)
 			{
-			    force << 0, 0, 0, 0, 0, 0;
+				/*delay_gate = 0;
+				ww = 0;
+				force << 0, 0, 0, 0, 0, 0;
+				zerox = 100 * al*(double)data[0] / 1000000 + (1 - 100 * al)*zerox;
+				zeroy = 100 * al*(double)data[1] / 1000000 + (1 - 100 * al)*zeroy;
 
-			    zerox = al*(double)data[0] / 1000000 + (1 - al)*zerox;
-			    zeroy = al*(double)data[1] / 1000000 + (1 - al)*zeroy;
+				x_00 << x_0;
+				x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
 
-			    /*q_new(0) = -1.779862;
-			    q_new(1) = 0.821814;
-			    q_new(2) = -0.067855;
-			    q_new(3) = 1.302481;
-			    q_new(4) = 0.284275;
-			    q_new(5) = -1.118251;*/
-			    q_new(0) = -1.5708;
-			    q_new(1) = 1.5708;
-			    q_new(2) = 0;
-			    q_new(3) = 1.5708;
-			    q_new(4) = 0;
-			    q_new(5) = -1.5708;
-			    q_freeze << q_new;
+				x_new << (inertia / 0.00001 + damping / 0.001 + stiffness).inverse()*(force + inertia*(x_0 - x_00) / 0.00001 + stiffness*(x_e - x_0)) + x_0;*/
+				q_new(0) = -1.779862;
+				q_new(1) = 0.821814;
+				q_new(2) = -0.067855;
+				q_new(3) = 1.302481;
+				q_new(4) = 0.284275;
+				q_new(5) = -1.118251;
+				
+			}
 
-			 }
+			met = met + 1;
 
+			if (met == 2000)
+			{
+				met = 0;
+			}
 
+			if (steady == 2500)
+			{
+				cc = 1;
+			}
 
 			stime = client.GetTimeStamp();
 
-
-			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %d %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), perturb_flag, x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5));
-
-			// Use commanded x--------------------------------------------------------------------------
-			x_003 << x_03;
-			x_03 << x_new;
-			x_new << (inertia/(0.000001) + damping/(0.001) + stiffness).inverse()*(force + (inertia/(0.000001))*(x_03 - x_003) + stiffness*(x_e - x_03)) + x_03;
-
-				//------------------------------------------------------------------------------------------
-
-			if (steady > 2000)
+			fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %d %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], ftx_un, fty_un, perturb_flag, q_new(0), q_new(1), q_new(2), q_new(3), q_new(4), q_new(5));
+			
+			//fprintf(OutputFile, "%d %lf %lf %lf %lf %lf %lf %lf %lf %1f %d %lf %lf %lf %lf %lf %lf\n", count, MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], MJoint[6], force(0), force(2), perturb_flag, x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5));
+			
+			if (c == 1)
 			{
-			    if (x_new(2) >= 0.94)
-			    {
-			      x_new(2) = 0.94;
-			    }
+				count2++;
 
-			    if (x_new(2) <= 0.58)
-			    {
-			      x_new(2) = 0.58;
-			    }
+				if (count2 == 200 || !success) //was "rows" not 400
+				{
+					c = 0;
+					count2 = 0;
+					std::cout << c << std::endl;
+				}
+				/*else
+				{
+					//move comanded joint to last joint
+					memcpy(client.LastJoint, client.NextJoint, 7 * sizeof(double));
+					//read in next joint command
 
-			    if (x_new(0) >= 0.18)
-			    {
-			      x_new(0) = 0.18;
-			    }
+					success2 = fscanf(InputFile, "%lf %lf %lf %lf %lf %lf %lf", &client.NextJoint[0], &client.NextJoint[1], &client.NextJoint[2], &client.NextJoint[3], &client.NextJoint[4], &client.NextJoint[5], &client.NextJoint[6]);
+					//std::cout << client.NextJoint[0] << std::endl;
 
-			    if (x_new(0) <= -0.18)
-			    {
-			      x_new(0) = -0.18;
-			    }
+					success2 = fscanf(InputFile, "%lf %lf %lf %lf %lf %lf %lf", &MJoint[0], &MJoint[1], &MJoint[2], &MJoint[3], &MJoint[4], &MJoint[5], &MJoint[6]);
+
+					if (!success2)
+					{
+						fprintf(stdout, "Error in reading file!\n");
+						fclose(OutputFile);
+						return 1;
+					}
+
+				}*/
 			}
-
-			if (0.58 <= x_new(2) & x_new(2) <= 0.94)
+			else
 			{
-			    if (-0.18 <= x_new(0) & x_new(0) <= 0.18)
-			    {
-			      qc << Ja.inverse()*(x_new - x_03);
-			      delta_q << delta_q +qc;
-			      q_new << delta_q +q_freeze;
-			    }
+				/*x_00 << x_0;
+				x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
+
+				x_new << (inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + x_0;
+				v=(x_new-x_0)/0.001;
+				//std::cout << x_new << std::endl;
+
+				if (trigger == 1) //prevent new joints commands from being sent during position perturbation
+				{
+					if (0.9 < x_new(2) & x_new(2) < 1.1)
+					{
+					  if (-0.09<x_new(0) & x_new(0)<0.09)
+					  {
+						q_new << Ja.inverse()*(inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + q_0;//+(q_old-q_0)*0.3;
+						//std::cout << q_new << std::endl;
+					  }																									 // std::cout << q_new << std::endl;
+					}
+				}
+
+				q_old << q_new;
+
+				q_delay << Ja.inverse()*(inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + q_0;
+				if (outerdelay > 9)
+				{
+					outerdelay = 0;
+
+				}
+				outerdelay = outerdelay + 1;*/
+
+				client.NextJoint[0] = q_new(0);
+				client.NextJoint[1] = q_new(1);
+				client.NextJoint[2] = q_new(2);
+				client.NextJoint[3] = q_new(3);
+				client.NextJoint[4] = q_new(4);
+				client.NextJoint[5] = q_new(5);
+				//client.NextJoint[6] = 1.0472;//-0.7854;
+				client.NextJoint[6] = -0.958709;
+				
+				/*client.NextJoint[0] = -1.570796;
+				client.NextJoint[1] = 1.570796;
+				client.NextJoint[2] = -1.570796;
+				client.NextJoint[3] = 0.523599;
+				client.NextJoint[4] = 1.570796;
+				client.NextJoint[5] = -1.570796;
+				client.NextJoint[6] = 1.0472;*/
+				//std::cout << q_new << std::endl;	
+				
+				/*client.NextJoint[0] = -1.779862;
+				client.NextJoint[1] = 0.821814;
+				client.NextJoint[2] = -0.067855;
+				client.NextJoint[3] = 1.302481;
+				client.NextJoint[4] = 0.284275;
+				client.NextJoint[5] = -1.118251;
+				client.NextJoint[6] = -0.958709;*/
+				
+				//memcpy(client.LastJoint, client.NextJoint,7*sizeof(double));
+				//success2 = fscanf(InputFile, "%lf %lf %lf %lf %lf %lf %lf", &client.NextJoint[0],&client.NextJoint[1],&client.NextJoint[2],&client.NextJoint[3],&client.NextJoint[4],&client.NextJoint[5],&client.NextJoint[6]);
+
 			}
-
-			client.NextJoint[0] = q_new(0);
-			client.NextJoint[1] = q_new(1);
-			client.NextJoint[2] = q_new(2);
-			client.NextJoint[3] = q_new(3);
-			client.NextJoint[4] = q_new(4);
-			client.NextJoint[5] = q_new(5);
-			client.NextJoint[6] = -0.958709;
-
-			// Send data to visualizer gui
-			xy_coord[0] = x_disp;
-			xy_coord[1] = y_disp;
-			udp_server.Send(xy_coord, 2);
 		}
 	}
 

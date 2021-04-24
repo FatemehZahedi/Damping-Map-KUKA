@@ -1,4 +1,6 @@
-#include <udp_server.h>
+#include <UdpServer/UdpServer.h>
+#include <vector>
+#include <iostream>
 
 #define _USE_MATH_DEFINES
 #include <cmath>
@@ -53,7 +55,6 @@ int main() {
 	while (1){
 		data[0] = x[i];
 		data[1] = y[i];
-        server.ReconnectIfNecessary();
 		server.Send(data, 2);
 		i = (i+1)%((int) n);
 		usleep(1000);

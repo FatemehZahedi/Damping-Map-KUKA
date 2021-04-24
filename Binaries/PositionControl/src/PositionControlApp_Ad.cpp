@@ -1,17 +1,24 @@
+
+#include <PositionControlClient.h>
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+
+#include <Eigen/Dense>
+
 #include <sys/time.h>
+#include <unistd.h>
+#include <sys/shm.h>
+
 #include <iostream>
 #include <cmath>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <string.h> // strstr
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
-#include <time.h>
-#include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
+#include <cstdlib>
+#include <cstdio>
+#include <cmath>
+#include <cstring>
+#include <ctime>
+
+
+
 
 using namespace std;
 using namespace KUKA::FRI;
@@ -70,6 +77,7 @@ int main(int argc, char** argv)
 	MatrixXd x_new(6, 1); x_new << 0, 0, 0, 0, 0, 0;
 
 	MatrixXd torques_0(6, 1); torques_0 << 0, 0, 0, 0, 0, 0;
+	MatrixXd t_e(6, 1); t_e << 0, 0, 0, 0, 0, 0;
 
 	// DH Parameter----------------------------------------------------
 	MatrixXd alpha(1, 7); alpha << M_PI / 2, -M_PI / 2, -M_PI / 2, M_PI / 2, M_PI / 2, -M_PI / 2, 0;
@@ -93,7 +101,7 @@ int main(int argc, char** argv)
 	gettimeofday(&start, NULL);
 	//??
 
-	if (argc < 2)
+	if (argc < 1)
 	{
 		printf(
 			"\nKUKA LBR Position Control application\n\n"
@@ -124,7 +132,7 @@ int main(int argc, char** argv)
 
 	// create new joint position client
 	PositionControlClient client;
-	client.intvalues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
+	client.InitValues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
 
 
 
@@ -146,14 +154,14 @@ int main(int argc, char** argv)
 	memcpy(MJoint, client.GetMeasJoint(), sizeof(double) * 7);
 
 	//Sending initial joint angels
-	client.NextJoint[0] = Mjoint[0];
-	client.NextJoint[1] = Mjoint[1];
-	client.NextJoint[2] = Mjoint[2];
-	client.NextJoint[3] = Mjoint[3];
-	client.NextJoint[4] = Mjoint[4];
-	client.NextJoint[5] = Mjoint[5];
+	client.NextJoint[0] = MJoint[0];
+	client.NextJoint[1] = MJoint[1];
+	client.NextJoint[2] = MJoint[2];
+	client.NextJoint[3] = MJoint[3];
+	client.NextJoint[4] = MJoint[4];
+	client.NextJoint[5] = MJoint[5];
 	//client.NextJoint[6] = -0.7854;
-	client.NextJoint[6] = Mjoint[6];
+	client.NextJoint[6] = MJoint[6];
 	memcpy(client.LastJoint, client.NextJoint, 7 * sizeof(double));
 
 	if (state < 2000)
@@ -172,7 +180,7 @@ int main(int argc, char** argv)
 		useconds = end.tv_usec - start.tv_usec;
 		mtime = ((seconds) * 1000 + useconds / 1000.0) + 0.5;
 		//----------------------------------------------------------------------
-
+		
 		if (count == 1)//first time inside
 		{
 			sampletime = client.GetTimeStep();
@@ -293,12 +301,12 @@ int main(int argc, char** argv)
 			0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0;
-		MatrixXd damping(6, 6); damping << 100000, 0, 0, 0, 0, 0,
-			0, 100000, 0, 0, 0, 0,
-			0, 0, 500, 0, 0, 0,
-			0, 0, 0, 500, 0, 0,
-			0, 0, 0, 0, 500, 0,
-			0, 0, 0, 0, 0, 500;
+		MatrixXd damping(6, 6); damping << 1, 0, 0, 0, 0, 0,
+			0, 1, 0, 0, 0, 0,
+			0, 0, 0.5, 0, 0, 0,
+			0, 0, 0, 0.5, 0, 0,
+			0, 0, 0, 0, 0.5, 0,
+			0, 0, 0, 0, 0, 0.5;
 		MatrixXd inertia(6, 6); inertia << 1, 0, 0, 0, 0, 0,
 			0, 1, 0, 0, 0, 0,
 			0, 0, 1, 0, 0, 0,
@@ -317,7 +325,7 @@ int main(int argc, char** argv)
 		{
 			firstIt = 1;
 			x_e << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
-			t_0 << -0.0313991, -0.414115, -0.00613078, -0.450773, 0.265899, -0.0418674;
+			//t_0 << -0.0313991, -0.414115, -0.00613078, -0.450773, 0.265899, -0.0418674;
 		}
 
 		ftx = (double)data[0] / 1000000 - zerox;
@@ -340,12 +348,12 @@ int main(int argc, char** argv)
 		x_0 << T06(0, 3), T06(1, 3), T06(2, 3), phi_euler, theta_euler, psi_euler;
 
 		//x_new << (inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + x_0;
-		x_new << (inertia + sampletime*damping + pow((sampletime),2)*stiffness).inverse()*(pow((sampletime), 2)*force + inertia*(2 * x_0 - x_00) + sampletime*damping*x_0) + x_0;
+		x_new << (inertia + damping + stiffness).inverse()*(force + inertia*(2 * x_0 - x_00) + damping*x_0 + stiffness*x_e) + x_0;
 
 		if (0.21 < x_new(2) & x_new(2) < 0.51)
 		{
 			//q_new << Ja.inverse()*(inertia + damping + stiffness).inverse()*(force + inertia*(x_0 - x_00) + stiffness*(x_e - x_0)) + q_0;//+(q_old-q_0)*0.3;
-			q_new << Ja.inverse()*(inertia + sampletime*damping + pow((sampletime), 2)*stiffness).inverse()*(pow((sampletime), 2)*force + inertia*(2 * x_0 - x_00) + sampletime*damping*x_0) + q_0;
+			q_new << Ja.inverse()*(inertia + damping + stiffness).inverse()*(force + inertia*(2 * x_0 - x_00) + damping*x_0 + stiffness*x_e) + q_0;
 		}
 
 		client.NextJoint[0] = q_new(0);
@@ -358,7 +366,7 @@ int main(int argc, char** argv)
 
 		fprintf(OutputFile, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n", MJoint[0], MJoint[1], MJoint[2], MJoint[3], MJoint[4], MJoint[5], ftx_un, fty_un, x_new(0), x_new(1), x_new(2), x_new(3), x_new(4), x_new(5));
 
-
+		
 	}
 
 	fclose(OutputFile);

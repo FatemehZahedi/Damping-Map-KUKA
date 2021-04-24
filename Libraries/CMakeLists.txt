@@ -1,2 +1,3 @@
 add_subdirectory(fri_client)
 add_subdirectory(udp_server)
+add_subdirectory(position_control_client)

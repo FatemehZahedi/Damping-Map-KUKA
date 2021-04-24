@@ -1,10 +1,11 @@
 
-// local headers
-#include "AdmittanceControl/PositionControlClient.h"
 
 // fri lib
 #include <friUdpConnection.h>
 #include <friClientApplication.h>
+
+// position control client lib
+#include <PositionControlClient.h>
 
 // udp server lib
 #include <UdpServer/UdpServer.h>
