@@ -1,5 +1,5 @@
 add_subdirectory(AdmittanceControl)
-# add_subdirectory(LBRClientTemplate)
+add_subdirectory(LBRClientTemplate)
 # add_subdirectory(LBRJointSineOverlay)
 # add_subdirectory(LBRTorqueSineOverlay)
 # add_subdirectory(LBRWrenchSineOverlay)
