@@ -1,18 +1,30 @@
-#include <sys/time.h>
+
+// local headers
+#include "AdmittanceControl/PositionControlClient.h"
+
+// fri lib
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+
+// udp server lib
+#include <UdpServer/UdpServer.h>
+
+// eigen lib
+#include <Eigen/Dense>
+
+// std lib
 #include <iostream>
 #include <cmath>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstdio>
+#include <cmath>
+#include <cstring>
+#include <ctime>
+
+// linux system headers
+#include <sys/time.h>
 #include <unistd.h>
-#include <math.h>
-#include <string.h>
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
-#include <time.h>
 #include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
-#include "UdpServer.h"
 
 
 using namespace std;

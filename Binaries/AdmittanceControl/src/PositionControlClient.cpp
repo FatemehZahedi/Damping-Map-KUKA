@@ -1,8 +1,13 @@
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
-#include "PositionControlClient.h"
-#include "friLBRState.h"
+// local headers
+#include "AdmittanceControl/PositionControlClient.h"
+
+// fri lib
+#include <friLBRState.h>
+
+// std lib
+#include <cstring>
+#include <cstdio>
+#include <cmath>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979
