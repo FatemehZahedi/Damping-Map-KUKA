@@ -1,7 +1,0 @@
-Name: Tanner Bitz
-Age: 25
-Weight: 168
-Height: 69
-Gender: M
-Number: 1
-H5File: tannerbitz.h5
