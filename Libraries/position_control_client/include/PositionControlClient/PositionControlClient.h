@@ -28,17 +28,16 @@ public:
    /**
     * \brief Callback for the FRI state 'Commanding Active'.
     */
-   	virtual void command();
-	void InitValues(double MRPStep[7], double MaxJLRad[7], double MinJLRad[7]);
-   	float GetTimeStep();
-	int GetTimeStamp();
-	double* GetMeasJoint();
-	double* GetExtTor();
-	double* GetComJoint();
-	void onStateChange(ESessionState oldState, ESessionState newState);
-	
+    virtual void command();
+    void InitValues(double MRPStep[7], double MaxJLRad[7], double MinJLRad[7]);
+    float GetTimeStep();
+    int GetTimeStamp();
+    double* GetMeasJoint();
+    double* GetExtTor();
+    double* GetComJoint();
+    void onStateChange(ESessionState oldState, ESessionState newState);
+    double* GetMeasTorque();
 
-      
 private:
    
 	int SecTime;
@@ -48,15 +47,16 @@ private:
    	double MeasuredJoint[7];
    	double CommandedJoint[7];
    	double ExternalTorque[7];
+    double MeasuredTorque[7];
 
 public:
-	double MaxRadPerStep[7];
-	double MRPStep[7];
-	double MaxJLRad[7];
-	double MinJLRad[7];
-	double LastJoint[7];
-	double NextJoint[7];
-	int KukaState;
+    double MaxRadPerStep[7];
+    double MRPStep[7];
+    double MaxJLRad[7];
+    double MinJLRad[7];
+    double LastJoint[7];
+    double NextJoint[7];
+    int KukaState;
 };
 
 

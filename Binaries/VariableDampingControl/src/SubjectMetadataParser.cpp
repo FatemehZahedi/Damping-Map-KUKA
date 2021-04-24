@@ -1,4 +1,4 @@
-#include <SubjectMetadataParser.h>
+#include <VariableDampingControl/SubjectMetadataParser.h>
 
 bool ParseSubjectMetadataFile(SubjectMetadata & smds, std::string filepath){
     /* Determine if file exists */

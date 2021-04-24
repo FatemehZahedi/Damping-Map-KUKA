@@ -1,14 +1,27 @@
 
-#include "TrignoEmgClient.h"
-#include "H5FunctionsNMCHRL.h"
+// local headers
+#include "VariableDampingControl/H5Functions.h"
+
+// Trigno Emg Client
+#include <TrignoEmgClient/TrignoEmgClient.h>
 
 // UDP Server
 #include <UdpServer/UdpServer.h>
 
+// Position Control Client
+#include <PositionControlClient.h>
+
 // FRI Client
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+
+// Eigen
+#include <Eigen/Dense>
+
+/* Boost filesystem */
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/path.hpp>
 
 // std library
 #include <algorithm>
@@ -19,20 +32,10 @@
 #include <ctime>
 #include <cstring>
 
+// linux headers
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/shm.h>
-
-// Eigen
-#include <Eigen/Dense>
-
-/* Boost filesystem */
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/path.hpp>
-
-/* HDF5 */
-#include "H5Cpp.h"
 
 
 using namespace std;
