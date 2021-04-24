@@ -1,6 +1,8 @@
-#include "TrignoEmgClient.h"
+#include "TrignoEmgClient/TrignoEmgClient.h"
+
 #include <boost/chrono.hpp>
 #include <boost/thread/thread.hpp>
+
 #include <thread>
 
 using namespace H5;

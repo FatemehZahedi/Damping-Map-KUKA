@@ -1,22 +1,23 @@
-#include <sys/time.h>
+
+#include "TrignoEmgClient/TrignoEmgClient.h"
+
 #include <iostream>
 #include <cmath>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <string.h>
-#include <time.h>
-#include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
-#include "TrignoEmgClient.h"
+#include <cstdlib>
+#include <cstdio>
+#include <cmath>
+#include <cstring>
+#include <ctime>
 #include <algorithm>
+
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/shm.h>
+
 /* Boost filesystem */
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
-/* HDF5 */
-#include "H5Cpp.h"
 
 
 using namespace std;

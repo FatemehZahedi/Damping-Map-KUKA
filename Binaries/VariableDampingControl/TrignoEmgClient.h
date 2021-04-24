@@ -1,11 +1,16 @@
+#pragma once
+
+#include <H5Cpp.h>
+
 #include <boost/asio.hpp>
+
 #include <exception>
-#include <stdio.h>
+#include <cstdio>
 #include <string>
 #include <map>
 #include <array>
 #include <queue>
-#include "H5Cpp.h"
+
 /* Boost filesystem */
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
