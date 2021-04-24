@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.8)
 
-add_library(FRIClient STATIC
+add_library(FRIClient STATIC)
+add_library(FRI::Client ALIAS FRIClient)
+
+target_sources(FRIClient PRIVATE
   # base
   include/base/friClientApplication.h
   include/base/friClientData.h
