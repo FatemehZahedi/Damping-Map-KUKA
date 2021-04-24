@@ -35,8 +35,9 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 
 
 */
-#include <stdio.h>
-#include "MyLBRClient.h"
+#include "LBRClientTemplate/MyLBRClient.h"
+
+#include <cstdio>
 
 //******************************************************************************
 MyLBRClient::MyLBRClient()
