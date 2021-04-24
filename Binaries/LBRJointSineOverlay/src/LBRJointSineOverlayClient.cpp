@@ -35,11 +35,17 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 
 
 */
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
-#include "LBRJointSineOverlayClient.h"
-#include "friLBRState.h"
+// local headers
+#include "LBRJointSineOverlay/LBRJointSineOverlayClient.h"
+
+// fri lib
+#include <friLBRState.h>
+
+// std lib
+#include <cstring>
+#include <cstdio>
+#include <cmath>
+
 
 #ifndef M_PI
 #define M_PI 3.14159265358979
