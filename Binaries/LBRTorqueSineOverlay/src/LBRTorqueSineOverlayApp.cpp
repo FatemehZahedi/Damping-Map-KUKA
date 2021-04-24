@@ -35,12 +35,17 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 
 
 */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h> // strstr
-#include "LBRTorqueSineOverlayClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
+// local headers
+#include "LBRTorqueSineOverlay/LBRTorqueSineOverlayClient.h"
+
+// fri lib
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+
+// std lib
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
 
 using namespace KUKA::FRI;
 
