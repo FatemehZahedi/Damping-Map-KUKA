@@ -1,8 +1,8 @@
-This repository houses code to run a 6 DOF KUKA LBRiiwa robot with various controller such as
+This repository houses code to run a 6-DOF KUKA LBRiiwa robot using the KUKA Fast Robot Interface C++ SDK with various controller such as
 - admittance control
 - variable damping control
 - position control
-using the KUKA Fast Robot Interface C++ SDK
+
 
 The repository structure is as follows
 Binaries - contains projects which compile to executables to run KUKA based experiments
@@ -15,7 +15,7 @@ Requirements
 - CMake 3.8+
 - C++11 compatible compiler
 
-Both of these should be readily available via a linux distro package manager such as rpm, apt, etc...
+Both of these should be readily available via a linux distro package manager such as rpm, apt, zypper, etc...
 
 
 ********************************************************************************
