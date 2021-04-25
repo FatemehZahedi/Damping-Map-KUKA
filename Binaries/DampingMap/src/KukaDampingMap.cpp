@@ -1,34 +1,44 @@
-#include <sys/time.h>
-#include <iostream>
-#include <cmath>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <math.h>
-#include <string.h> // strstr
-#include "PositionControlClient.h"
-#include "friUdpConnection.h"
-#include "friClientApplication.h"
-#include <time.h>
-#include <sys/shm.h>
-#include <eigen3/Eigen/Dense>
-#include "UdpServer.h"
-/* EMG */
-#include "TrignoEmgClient.h"
-#include <algorithm>
+// Trigno Emg Client
+#include <TrignoEmgClient/TrignoEmgClient.h>
+
+// UDP Server
+#include <UdpServer/UdpServer.h>
+
+// Position Control Client
+#include <PositionControlClient.h>
+
+// FRI Client
+#include <friUdpConnection.h>
+#include <friClientApplication.h>
+
+// Eigen
+#include <Eigen/Dense>
+
 /* Boost filesystem */
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
-/* HDF5 */
-#include "H5Cpp.h"
+
+// std library
+#include <algorithm>
+#include <iostream>
+#include <cmath>
+#include <cstdlib>
+#include <cstdio>
+#include <ctime>
+#include <cstring>
+
+// linux headers
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/shm.h>
+
 
 
 using namespace std;
 using namespace KUKA::FRI;
 using namespace Eigen;
 using namespace boost::filesystem;
-//using namespace H5;
 
 #define DEFAULT_PORTID 30200
 #define DEFAULT_IP "192.170.10.2"  //ip address set for KONI connection
@@ -565,7 +575,7 @@ int main(int argc, char** argv)
 
 	// create new joint position client
 	PositionControlClient client;
-	client.intvalues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
+	client.InitValues(MaxRadPerStep, MaxJointLimitRad, MinJointLimitRad);
 
 
 
